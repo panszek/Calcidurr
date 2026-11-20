@@ -1,0 +1,102 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  background: #1c1b19;
+  color: #f3efe6;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
+#toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  background: #2a2824;
+  border-bottom: 1px solid #3e3a33;
+}
+
+#toolbar .group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding-right: 10px;
+  border-right: 1px solid #4a453c;
+}
+
+#toolbar .group:last-child {
+  border-right: 0;
+}
+
+#toolbar button,
+#toolbar label.chip {
+  appearance: none;
+  border: 1px solid #5a5448;
+  background: #3a372f;
+  color: #f3efe6;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#toolbar button.active,
+#toolbar label.chip.active {
+  background: #c9a227;
+  color: #1c1b19;
+  border-color: #e4c35a;
+  font-weight: 700;
+}
+
+#toolbar input[type="radio"] {
+  display: none;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 99px;
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: -2px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+#stage {
+  flex: 1;
+  min-height: 0;
+}
+
+#board {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: #3b1d16;
+  color: #ffd7c4;
+  border: 1px solid #c45c32;
+  padding: 10px 16px;
+  border-radius: 10px;
+  max-width: 640px;
+}
