@@ -1,4 +1,5 @@
-import { WIRE_COLORS } from "../data/colors";
+import { MARK_FILL, WIRE_COLORS } from "../data/colors";
+import { UPPER_TERMINAL_GROUPS, LOWER_TERMINAL_GROUPS } from "../data/terminalLegend";
 import { isWireLive } from "../engine/simulation";
 import { isWireEndSecure } from "../models/world";
 import type { Point, Port, SimState, TerminalColumn, World } from "../models/types";
@@ -87,18 +88,44 @@ function fillOsb(ctx: CanvasRenderingContext2D, w: number, h: number) {
   // Top DIN rail for MK1, MK2, MK3
   drawDinRail(840, 80, 400, 24);
 
-  // Upper terminal strip DIN rail
-  drawDinRail(680, 245, 1450, 26);
+  // Upper terminal strip DIN rail (upperY = 180, center at 235)
+  drawDinRail(680, 235, 1450, 26);
 
-  // Lower terminal strip DIN rail
-  drawDinRail(680, 415, 1250, 26);
+  // Lower terminal strip DIN rail (lowerY = 460, center at 515)
+  drawDinRail(680, 515, 1250, 26);
+}
+
+function formatPosterGroupTitle(title: string): string {
+  // Mágneskapcsolók a plakáton: egyszerűen MK1, MK2 vagy MK3
+  if (/MK1/i.test(title)) return "MK1";
+  if (/MK2/i.test(title)) return "MK2";
+  if (/MK3/i.test(title)) return "MK3";
+
+  // Kapcsolók a plakáton: csak a kódjuk (101N, 106, 107, 101, 102, 105)
+  const switchMatch = title.match(/\b(101N|106|107|101|102|105)\b/i);
+  if (switchMatch) return switchMatch[1].toUpperCase();
+
+  // Rövidebb címkék a keskeny cellákhoz a plakáton
+  if (/3\s*FÁZIS\s*NULLÁJA/i.test(title)) return "3F N";
+  if (/1\s*FÁZIS\s*NULLÁJA/i.test(title)) return "1F N";
+  if (/3P\s*C16A/i.test(title)) return "3P C16A";
+  if (/1P\s*B10A/i.test(title)) return "1P B10A";
+  if (/1P\s*B16A/i.test(title)) return "1P B16A";
+  if (/LÉPCSŐHÁZI/i.test(title)) return "LÉPCSŐHÁZI";
+  if (/DUGASZOLÓALJZAT/i.test(title)) return "DUGALJ";
+  if (/BAL\s*OLDALI/i.test(title)) return "BAL";
+  if (/SZIGET/i.test(title)) return "SZIGET";
+  if (/JOBB\s*OLDALI/i.test(title)) return "JOBB";
+  if (/MOZGÁSÉRZÉKELŐ/i.test(title)) return "PIR";
+
+  return title;
 }
 
 function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   // 1. Kiselosztó szekrény doboza (Distribution enclosure on the left)
   ctx.save();
   // Outer white enclosure frame
-  roundRect(ctx, 70, 115, 488, 175, 10);
+  roundRect(ctx, 70, 105, 488, 175, 10);
   ctx.fillStyle = "#f3f5f8";
   ctx.fill();
   ctx.strokeStyle = "#8b929c";
@@ -106,18 +133,18 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 
   // Inner cavity (darker recess)
-  roundRect(ctx, 84, 138, 460, 138, 6);
+  roundRect(ctx, 84, 128, 460, 138, 6);
   ctx.fillStyle = "#2c313a";
   ctx.fill();
 
   // Internal DIN rail
   ctx.fillStyle = "#8d939e";
-  ctx.fillRect(86, 200, 456, 18);
+  ctx.fillRect(86, 190, 456, 18);
   ctx.fillStyle = "#656a73";
-  ctx.fillRect(86, 206, 456, 4);
+  ctx.fillRect(86, 196, 456, 4);
 
   // Smoked semi-transparent acrylic door frame (top hinged)
-  roundRect(ctx, 76, 122, 476, 160, 8);
+  roundRect(ctx, 76, 112, 476, 160, 8);
   ctx.fillStyle = "rgba(40, 52, 68, 0.28)";
   ctx.fill();
   ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
@@ -128,15 +155,15 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#64748b";
   ctx.font = "700 9px Segoe UI";
   ctx.textAlign = "left";
-  ctx.fillText("KISELOSZTÓ • IP40", 90, 132);
+  ctx.fillText("KISELOSZTÓ • IP40", 90, 122);
   ctx.restore();
 
   // 2. Sorkapocs-kiosztás plakát (Poster on the board under wagos)
   ctx.save();
-  const px = 710;
-  const py = 620;
-  const pw = 1400;
-  const ph = 155;
+  const px = 680;
+  const py = 725;
+  const pw = 1460;
+  const ph = 315;
   // White laminated paper
   roundRect(ctx, px, py, pw, ph, 4);
   ctx.fillStyle = "#ffffff";
@@ -160,88 +187,123 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   ctx.fillText("OKTATÓFALI SORKAPOCS-KIOSZTÁSI JEGYZÉK (KAPCSOLÁSI TERV ÉS SZÍNKÓDOK)", px + 18, py + 21);
 
   // Clickable badge prompt
-  roundRect(ctx, px + pw - 340, py + 6, 324, 22, 4);
+  roundRect(ctx, px + pw - 340, py + 5, 324, 22, 4);
   ctx.fillStyle = "#0284c7";
   ctx.fill();
   ctx.fillStyle = "#ffffff";
   ctx.font = "700 10.5px Segoe UI";
   ctx.textAlign = "center";
-  ctx.fillText("📋 KATTINTS IDE A NAGYÍTOTT JEGYZÉKHEZ", px + pw - 178, py + 21);
+  ctx.fillText("📋 KATTINTS IDE A NAGYÍTOTT JEGYZÉKHEZ", px + pw - 178, py + 20);
 
-  // FELSŐ SORKAPOCSSOR (X1) - Mini áttekintő sáv
-  ctx.fillStyle = "#334155";
-  ctx.font = "800 10px Segoe UI";
+  // FELSŐ SORKAPOCSSOR (X1 • 65 db sorkapocs) - Részletes rajzolat
+  ctx.fillStyle = "#1e293b";
+  ctx.font = "800 10.5px Segoe UI";
   ctx.textAlign = "left";
-  ctx.fillText("FELSŐ SOR (X1 • 65 db): 3F N • 3P C16A • 1F N • PE • 1P B10A • 1P B16A • IMPULZUS • LÉPCSŐHÁZI • IDŐRELÉ • MK1..MK3 BE/KI • MOTORVÉDŐ", px + 18, py + 48);
+  ctx.fillText("FELSŐ SORKAPOCSSOR (X1 • 65 db kapocs) — TÁPOK, KISMEGSZAKÍTÓK, RELÉK, MÁGNESKAPCSOLÓK, MOTORVÉDŐ", px + 18, py + 48);
 
-  // 65 felső oszlop mini színkód csíkja
-  const topColors = [
-    "#2563eb", // 3F N
-    "#eab308", "#eab308", "#eab308", // 3P C16A
-    "#2563eb", // 1F N
-    "#16a34a", // PE
-    "#16a34a", // 1P B10A
-    "#dc2626", // 1P B16A
-    "#eab308", "#2563eb", "#eab308", "#eab308", // Impulzus
-    "#2563eb", "#78350f", "#78350f", "#78350f", // Lépcsőházi
-    "#dc2626", "#dc2626", "#dc2626", "#dc2626", "#2563eb", // Időrelé
-    "#eab308", "#eab308", "#eab308", // MK1 be
-    "#18181b", "#18181b", "#18181b", // MK2 be
-    "#dc2626", "#dc2626", "#dc2626", // MK3 be
-    "#78350f", "#78350f", "#78350f", // Motorvédő be
-    "#eab308", "#eab308", "#eab308", // MK1 ki
-    "#18181b", "#18181b", "#18181b", // MK2 ki
-    "#dc2626", "#dc2626", "#dc2626", // MK3 ki
-    "#78350f", "#78350f", "#78350f", // Motorvédő ki
-    "#eab308", "#eab308", "#eab308", "#eab308", "#eab308", "#2563eb", // MK1 segéd
-    "#18181b", "#18181b", "#18181b", "#18181b", "#18181b", "#2563eb", // MK2 segéd
-    "#dc2626", "#dc2626", "#dc2626", "#dc2626", "#dc2626", "#2563eb", // MK3 segéd
-    "#78350f", "#78350f" // Motorvédő 95-96
-  ];
-  const barStartX = px + 18;
-  const colWTop = (pw - 36) / 65;
-  topColors.forEach((c, idx) => {
-    ctx.fillStyle = c;
-    ctx.fillRect(barStartX + idx * colWTop, py + 54, colWTop - 1, 12);
-  });
+  const tableStartX = px + 16;
+  const tableW = pw - 32;
+  const colWTop = tableW / 65;
 
-  // ALSÓ SORKAPOCSSOR (X2) - Mini áttekintő sáv
-  ctx.fillStyle = "#334155";
-  ctx.font = "800 10px Segoe UI";
-  ctx.fillText("ALSÓ SOR (X2 • 54 db): DUGALJ • 106 VÁLTÓ • 107 KERESZT • 106 • 101N NYOMÓK • 101 • 102 • 105 CSILLÁR • BAL/SZIGET/JOBB GOMBOK • IZZÓK 1..3 • PIR", px + 18, py + 86);
+  let curTopColIdx = 0;
+  for (const group of UPPER_TERMINAL_GROUPS) {
+    const grpCount = group.terminals.length;
+    const grpX = tableStartX + curTopColIdx * colWTop;
+    const grpW = grpCount * colWTop;
 
-  const botColors = [
-    "#eab308", "#2563eb", "#16a34a", // Dugalj
-    "#18181b", "#18181b", "#18181b", // 106 (1)
-    "#f8fafc", "#f8fafc", "#f8fafc", "#f8fafc", // 107
-    "#2563eb", "#2563eb", "#2563eb", // 106 (2)
-    "#dc2626", "#dc2626", // 101N (1)
-    "#eab308", "#eab308", // 101N (2)
-    "#16a34a", "#16a34a", // 101N (3)
-    "#2563eb", "#2563eb", // 101
-    "#dc2626", "#dc2626", "#2563eb", "#2563eb", // 102
-    "#eab308", "#eab308", "#eab308", // 105
-    "#16a34a", "#16a34a", "#dc2626", "#dc2626", // Bal gombok
-    "#16a34a", "#16a34a", "#dc2626", "#dc2626", "#16a34a", "#16a34a", // Nyomógomb sziget (6 kapocs!)
-    "#16a34a", "#16a34a", "#dc2626", "#dc2626", // Jobb gombok
-    "#78350f", "#2563eb", "#16a34a", // Izzó 1
-    "#16a34a", "#2563eb", "#16a34a", // Izzó 2
-    "#eab308", "#2563eb", "#16a34a", // Izzó 3
-    "#dc2626", "#2563eb", "#dc2626"  // PIR
-  ];
-  const colWBot = (pw - 36) / 54;
-  botColors.forEach((c, idx) => {
-    ctx.fillStyle = c;
-    ctx.fillRect(barStartX + idx * colWBot, py + 92, colWBot - 1, 12);
-  });
+    // Group outline
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(grpX, py + 54, grpW, 58);
 
-  // Bekötési és használati útmutató lábléc
-  ctx.fillStyle = "#64748b";
-  ctx.font = "600 9.5px Segoe UI";
-  ctx.fillText("Bekötési logika: A sorkapcsok felső oldala gyárilag bekötött (fix átvezetés). A kapcsolási vezetéket kizárólag az ALSÓ nyílásba kösd be, és az alsó csavart húzd meg csavarhúzóval!", px + 18, py + 124);
+    // Group title
+    const displayTitle = formatPosterGroupTitle(group.title);
+    ctx.fillStyle = "#1e293b";
+    ctx.textAlign = "center";
+    ctx.font = displayTitle.length <= 4 ? "800 9px Segoe UI" : "700 8px Segoe UI";
+    ctx.fillText(displayTitle, grpX + grpW / 2, py + 66);
+
+    // Terminals in group
+    for (let tIdx = 0; tIdx < grpCount; tIdx++) {
+      const term = group.terminals[tIdx];
+      const tx = grpX + tIdx * colWTop;
+
+      // Pin label
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "800 8.5px Segoe UI";
+      ctx.textAlign = "center";
+      ctx.fillText(term.label, tx + colWTop / 2, py + 80);
+
+      // Color mark square
+      const swatchCol = MARK_FILL[term.mark] ?? "#94a3b8";
+      ctx.fillStyle = swatchCol;
+      roundRect(ctx, tx + 2, py + 86, colWTop - 4, 20, 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    curTopColIdx += grpCount;
+  }
+
+  // ALSÓ SORKAPOCSSOR (X2 • 54 db sorkapocs) - Részletes rajzolat
+  ctx.fillStyle = "#1e293b";
+  ctx.font = "800 10.5px Segoe UI";
+  ctx.textAlign = "left";
+  ctx.fillText("ALSÓ SORKAPOCSSOR (X2 • 54 db kapocs) — DUGALJ, KAPCSOLÓK (106, 107, 101N, 101, 102, 105), GOMBOK, IZZÓK, PIR", px + 18, py + 132);
+
+  const colWBot = (colWTop * 65) / 54; // vagy a teljes tábla szélessége alapján
+  let curBotColIdx = 0;
+  for (const group of LOWER_TERMINAL_GROUPS) {
+    const grpCount = group.terminals.length;
+    const grpX = tableStartX + curBotColIdx * colWBot;
+    const grpW = grpCount * colWBot;
+
+    // Group outline
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(grpX, py + 138, grpW, 58);
+
+    // Group title
+    const displayTitle = formatPosterGroupTitle(group.title);
+    ctx.fillStyle = "#1e293b";
+    ctx.textAlign = "center";
+    ctx.font = displayTitle.length <= 4 ? "800 9.5px Segoe UI" : "700 8px Segoe UI";
+    ctx.fillText(displayTitle, grpX + grpW / 2, py + 150);
+
+    // Terminals in group
+    for (let tIdx = 0; tIdx < grpCount; tIdx++) {
+      const term = group.terminals[tIdx];
+      const tx = grpX + tIdx * colWBot;
+
+      // Pin label
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "800 8.5px Segoe UI";
+      ctx.textAlign = "center";
+      ctx.fillText(term.label, tx + colWBot / 2, py + 164);
+
+      // Color mark square
+      const swatchCol = MARK_FILL[term.mark] ?? "#94a3b8";
+      ctx.fillStyle = swatchCol;
+      roundRect(ctx, tx + 2, py + 170, colWBot - 4, 20, 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    curBotColIdx += grpCount;
+  }
+
+  // Bekötési és használati útmutató lábléc a plakáton
+  ctx.fillStyle = "#475569";
+  ctx.font = "600 10.5px Segoe UI";
+  ctx.textAlign = "left";
+  ctx.fillText("Bekötési logika: A sorkapcsok felső oldala gyárilag bekötött (fix fali átvezetés). A kapcsolási vezetéket kizárólag az ALSÓ nyílásba kösd be, és az alsó csavart húzd meg csavarhúzóval!", px + 18, py + 235);
   ctx.fillStyle = "#0284c7";
-  ctx.font = "700 9.5px Segoe UI";
-  ctx.fillText("Tipp: A felső menüsorban lévő '📋 Sorkapocs tábla' gombbal kényelmesen kinagyítható a teljes függőleges feliratozású jegyzék.", px + 18, py + 140);
+  ctx.font = "700 10.5px Segoe UI";
+  ctx.fillText("Tipp: A felső menüsorban lévő '📋 Sorkapocs tábla' gombra vagy közvetlenül a fenti plakátra kattintva megnyílik a teljes függőleges feliratozású segédtáblázat.", px + 18, py + 255);
 
   // Thumbtacks in 4 corners
   const drawPin = (tx: number, ty: number) => {
@@ -260,19 +322,19 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
 
   // 3. Alsó munkapad asztal és szerszámok (Workbench shelf at the bottom)
   ctx.save();
-  const by = 800;
+  const by = 1070;
   // Wooden tabletop
   ctx.fillStyle = "#ad824a";
-  ctx.fillRect(0, by, 2200, 160);
+  ctx.fillRect(0, by, 2200, 230);
   ctx.fillStyle = "#8a612d";
   ctx.fillRect(0, by, 2200, 8);
   ctx.strokeStyle = "#65451e";
   ctx.lineWidth = 1;
-  ctx.strokeRect(0, by, 2200, 160);
+  ctx.strokeRect(0, by, 2200, 230);
 
   // 3-Phase CEE 16A red plug on the left wall with white cable
   // White wall junction box
-  roundRect(ctx, 90, 830, 80, 80, 6);
+  roundRect(ctx, 90, by + 30, 80, 80, 6);
   ctx.fillStyle = "#ffffff";
   ctx.fill();
   ctx.strokeStyle = "#9ca3af";
@@ -280,44 +342,44 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   // 5 terminal dots on box
   for (let i = 0; i < 5; i++) {
     ctx.beginPath();
-    ctx.arc(106 + i * 12, 870, 3.5, 0, Math.PI * 2);
+    ctx.arc(106 + i * 12, by + 70, 3.5, 0, Math.PI * 2);
     ctx.fillStyle = "#333";
     ctx.fill();
   }
   // Thick white supply cable
   ctx.beginPath();
-  ctx.moveTo(130, 910);
-  ctx.bezierCurveTo(130, 940, 110, 950, 110, 960);
+  ctx.moveTo(130, by + 110);
+  ctx.bezierCurveTo(130, by + 150, 110, by + 190, 110, 1300);
   ctx.lineWidth = 12;
   ctx.strokeStyle = "#e5e7eb";
   ctx.stroke();
   // Red CEE plug
-  roundRect(ctx, 92, 940, 36, 48, 6);
+  roundRect(ctx, 92, by + 160, 36, 48, 6);
   ctx.fillStyle = "#dc2626";
   ctx.fill();
   ctx.strokeStyle = "#991b1b";
   ctx.stroke();
 
   // Blueprint diagram on the desk
-  roundRect(ctx, 320, 825, 140, 100, 3);
+  roundRect(ctx, 320, by + 25, 140, 100, 3);
   ctx.fillStyle = "#ffffff";
   ctx.fill();
   ctx.strokeStyle = "#9ca3af";
   ctx.stroke();
   ctx.fillStyle = "#1e3a8a";
   ctx.font = "700 8.5px Segoe UI";
-  ctx.fillText("KAPCSOLÁSI RAJZ", 330, 842);
+  ctx.fillText("KAPCSOLÁSI RAJZ", 330, by + 42);
   ctx.strokeStyle = "#2563eb";
   ctx.lineWidth = 1;
-  ctx.strokeRect(330, 850, 60, 45);
+  ctx.strokeRect(330, by + 50, 60, 45);
   ctx.beginPath();
-  ctx.moveTo(340, 872);
-  ctx.lineTo(410, 872);
+  ctx.moveTo(340, by + 72);
+  ctx.lineTo(410, by + 72);
   ctx.stroke();
 
   // Screwdriver on the desk
   ctx.save();
-  ctx.translate(560, 850);
+  ctx.translate(560, by + 50);
   ctx.rotate(0.3);
   // Yellow handle
   roundRect(ctx, -6, -24, 12, 32, 4);
@@ -335,7 +397,7 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
 
   // Pliers on the desk
   ctx.save();
-  ctx.translate(650, 860);
+  ctx.translate(650, by + 60);
   ctx.rotate(-0.2);
   // Red/black handles
   roundRect(ctx, -14, 0, 10, 38, 4);
@@ -348,21 +410,21 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   ctx.restore();
 
   // Multimeter on the desk
-  roundRect(ctx, 750, 825, 75, 110, 8);
+  roundRect(ctx, 750, by + 25, 75, 110, 8);
   ctx.fillStyle = "#dc2626";
   ctx.fill();
   ctx.strokeStyle = "#991b1b";
   ctx.stroke();
   // Screen
-  roundRect(ctx, 760, 835, 55, 24, 3);
+  roundRect(ctx, 760, by + 35, 55, 24, 3);
   ctx.fillStyle = "#a3e635";
   ctx.fill();
   ctx.fillStyle = "#166534";
   ctx.font = "800 11px monospace";
-  ctx.fillText("230.4 V", 764, 852);
+  ctx.fillText("230.4 V", 764, by + 52);
   // Dial
   ctx.beginPath();
-  ctx.arc(787, 882, 16, 0, Math.PI * 2);
+  ctx.arc(787, by + 82, 16, 0, Math.PI * 2);
   ctx.fillStyle = "#1f2937";
   ctx.fill();
 
@@ -1149,7 +1211,7 @@ export function renderWorld(
   sim: SimState,
   extras: RenderExtras,
 ) {
-  fillOsb(ctx, 2200, 960);
+  fillOsb(ctx, 2200, 1300);
   drawBackgroundFixtures(ctx);
 
   // Terminals and wagos
@@ -1200,7 +1262,7 @@ export function renderWorld(
   // Debug overlay
   if (extras.debug) {
     ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-    roundRect(ctx, 70, 755, 600, 36, 4);
+    roundRect(ctx, 70, 725, 580, 36, 4);
     ctx.fill();
     ctx.strokeStyle = "#38bdf8";
     ctx.stroke();
@@ -1211,7 +1273,7 @@ export function renderWorld(
     const text = sim.warnings.length
       ? sim.warnings.join("  •  ")
       : "Rendszer üzemkész: nincs zárlat, nincs laza kötés.";
-    ctx.fillText(`DEBUG: ${text}`, 80, 777);
+    ctx.fillText(`DEBUG: ${text}`, 80, 747);
   }
 
   // Tooltip

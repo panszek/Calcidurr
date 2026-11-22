@@ -33,7 +33,7 @@ const toolbar = document.querySelector<HTMLElement>("#toolbar")!;
 const toastEl = document.querySelector<HTMLDivElement>("#toast")!;
 const ctx = canvas.getContext("2d")!;
 
-const LOGICAL = { w: 2200, h: 960 };
+const LOGICAL = { w: 2200, h: 1300 };
 let view = { scale: 0.5, ox: 0, oy: 0 };
 
 let world: World = createPrototypeWorld();

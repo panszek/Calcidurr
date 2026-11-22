@@ -63,10 +63,10 @@ export function hitScrewdriverTarget(world: World, p: Point): Port | undefined {
  * Ellenőrzi, hogy a kattintás az oktatófalon lévő magyarázó plakátra esett-e.
  */
 export function hitLegendPoster(p: Point): boolean {
-  const px = 710;
-  const py = 620;
-  const pw = 1400;
-  const ph = 155;
+  const px = 680;
+  const py = 725;
+  const pw = 1460;
+  const ph = 315;
   return p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph;
 }
 

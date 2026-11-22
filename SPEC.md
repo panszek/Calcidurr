@@ -137,6 +137,9 @@ A prototípus validációja és a valós fotó (`sources/sorkapocs_kiosztas.png`
 16. **IZZÓ 3:** `L` (Sárga), `N` (Kék), `PE` (Zöld-sárga)
 17. **MOZGÁSÉRZÉKELŐ:** `L↑` (Piros), `N↑` (Kék), `L↓` (Piros)
 
-### 8.5. WAGO ÉS GYAKORLÓTÉR:
-- A két sorkapocssor alatt 5 darab 5-ös Wago összekötő blokk működő, egyenként kattintható emelőkarokkal.
+### 8.5. TÁBLAMÉRET, WAGO ÉS GYAKORLÓTÉR:
+- **Megnövelt munkatér (2200 x 1300 px):** A tábla teljes magassága megnövelt, biztosítva a bőséges helyet mind a vezetékezésnek, mind az oktatófali plakátnak.
+- **Sorkapocssínek távolsága:** A felső sorkapocssor (`y = 180`) és az alsó sorkapocssor (`y = 460`) között több mint 140 px tiszta átvezető sáv áll rendelkezésre, így a felső és alsó kapcsok közötti kötések kényelmesen, áttekinthetően és kereszteződések nélkül vezethetők el.
+- **Wago blokkok:** Az alsó sorkapocssor alatt 5 darab 5-ös Wago összekötő blokk működő, egyenként kattintható emelőkarokkal (`y = 635`).
+- **Valósághű Magyarázó Plakát a falon (`y = 725..1040`):** Közvetlenül a Canvas felületén elhelyezett nagy méretű (1460 x 315 px) plakát, amely nemcsak egyszerű színcsíkokat mutat, hanem feliratozva, oszloponként részletesen ábrázolja a teljes 65-ös felső és 54-es alsó sorkapocskiosztást (eszköznevek, kapocsponti jelölések, színkód-négyzetek).
 - A szimulációs motorban mind a 3 fázis, mind a védelmi eszközök (C16A, B10A, B16A, motorvédő), az impulzusrelé, lépcsőházi automata, időrelé, mágneskapcsolók (fő- és segédérintkezők) és fényforrások/érzékelők teljes gráf-alapú logikája implementálva van.

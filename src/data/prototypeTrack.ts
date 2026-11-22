@@ -253,11 +253,11 @@ export function createPrototypeWorld(): World {
   };
 
   // Pozíciók a pelda_kotes.jpg alapján
-  // A sorkapocssorok középen találhatók, egymás alatt
+  // A sorkapocssorok egymás alatt találhatók, bőséges hellyel a kötésekhez
   const upperStartX = 690;
-  const upperY = 190;
+  const upperY = 180;
   const lowerStartX = 690;
-  const lowerY = 360;
+  const lowerY = 460;
   // A vezetékek bekötési pontja kizárólag a sorkapocs alsó nyílásában van (y + 122)
   const portY = (colY: number) => colY + 122;
 
@@ -488,13 +488,13 @@ export function createPrototypeWorld(): World {
     );
   }
 
-  // 5 darab 5-ös Wago összekötő a pelda_kotes.jpg alapján közvetlenül az alsó sorkapocssor alatt
+  // 5 darab 5-ös Wago összekötő az alsó sorkapocssor alatt kényelmes távolságban
   const wagos: WagoBlock[] = [
-    { id: "wago-1", nodeId: "wago_node_1", x: 700, y: 535, portIds: ["w1_1", "w1_2", "w1_3", "w1_4", "w1_5"] },
-    { id: "wago-2", nodeId: "wago_node_2", x: 860, y: 535, portIds: ["w2_1", "w2_2", "w2_3", "w2_4", "w2_5"] },
-    { id: "wago-3", nodeId: "wago_node_3", x: 1020, y: 535, portIds: ["w3_1", "w3_2", "w3_3", "w3_4", "w3_5"] },
-    { id: "wago-4", nodeId: "wago_node_4", x: 1180, y: 535, portIds: ["w4_1", "w4_2", "w4_3", "w4_4", "w4_5"] },
-    { id: "wago-5", nodeId: "wago_node_5", x: 1340, y: 535, portIds: ["w5_1", "w5_2", "w5_3", "w5_4", "w5_5"] },
+    { id: "wago-1", nodeId: "wago_node_1", x: 700, y: 635, portIds: ["w1_1", "w1_2", "w1_3", "w1_4", "w1_5"] },
+    { id: "wago-2", nodeId: "wago_node_2", x: 860, y: 635, portIds: ["w2_1", "w2_2", "w2_3", "w2_4", "w2_5"] },
+    { id: "wago-3", nodeId: "wago_node_3", x: 1020, y: 635, portIds: ["w3_1", "w3_2", "w3_3", "w3_4", "w3_5"] },
+    { id: "wago-4", nodeId: "wago_node_4", x: 1180, y: 635, portIds: ["w4_1", "w4_2", "w4_3", "w4_4", "w4_5"] },
+    { id: "wago-5", nodeId: "wago_node_5", x: 1340, y: 635, portIds: ["w5_1", "w5_2", "w5_3", "w5_4", "w5_5"] },
   ];
 
   for (const wago of wagos) {
@@ -517,7 +517,7 @@ export function createPrototypeWorld(): World {
       id: "dev_lamp1",
       type: "lamp",
       title: "Izzó 1",
-      bounds: { x: 130, y: 25, w: 68, h: 68 },
+      bounds: { x: 130, y: 20, w: 68, h: 68 },
       nodeIds: ["lamp1_l", "lamp1_n", "lamp1_pe"],
       on: false,
       pressed: false,
@@ -527,7 +527,7 @@ export function createPrototypeWorld(): World {
       id: "dev_lamp2",
       type: "lamp",
       title: "Izzó 2",
-      bounds: { x: 235, y: 25, w: 68, h: 68 },
+      bounds: { x: 235, y: 20, w: 68, h: 68 },
       nodeIds: ["lamp2_l", "lamp2_n", "lamp2_pe"],
       on: false,
       pressed: false,
@@ -537,7 +537,7 @@ export function createPrototypeWorld(): World {
       id: "dev_lamp3",
       type: "lamp",
       title: "Izzó 3",
-      bounds: { x: 340, y: 25, w: 68, h: 68 },
+      bounds: { x: 340, y: 20, w: 68, h: 68 },
       nodeIds: ["lamp3_l", "lamp3_n", "lamp3_pe"],
       on: false,
       pressed: false,
@@ -550,7 +550,7 @@ export function createPrototypeWorld(): World {
       id: "mcb_3p",
       type: "mcb3p",
       title: "3P C16A",
-      bounds: { x: 100, y: 155, w: 72, h: 100 },
+      bounds: { x: 100, y: 145, w: 72, h: 100 },
       nodeIds: ["mcb3_l1", "mcb3_l2", "mcb3_l3"],
       on: true,
       pressed: false,
@@ -561,7 +561,7 @@ export function createPrototypeWorld(): World {
       id: "mcb_1p_b10",
       type: "mcb1p",
       title: "1P B10A",
-      bounds: { x: 178, y: 155, w: 32, h: 100 },
+      bounds: { x: 178, y: 145, w: 32, h: 100 },
       nodeIds: ["mcb1_b10_l1"],
       on: true,
       pressed: false,
@@ -572,7 +572,7 @@ export function createPrototypeWorld(): World {
       id: "mcb_1p_b16",
       type: "mcb1p",
       title: "1P B16A",
-      bounds: { x: 214, y: 155, w: 32, h: 100 },
+      bounds: { x: 214, y: 145, w: 32, h: 100 },
       nodeIds: ["mcb1_b16_l1"],
       on: true,
       pressed: false,
@@ -583,7 +583,7 @@ export function createPrototypeWorld(): World {
       id: "dev_impulse",
       type: "impulse_relay",
       title: "Impulzusrelé",
-      bounds: { x: 252, y: 155, w: 58, h: 100 },
+      bounds: { x: 252, y: 145, w: 58, h: 100 },
       nodeIds: ["imp_a1", "imp_a2", "imp_1", "imp_2"],
       on: false,
       relayState: false,
@@ -595,7 +595,7 @@ export function createPrototypeWorld(): World {
       id: "dev_staircase",
       type: "staircase_relay",
       title: "Lépcsőházi aut.",
-      bounds: { x: 316, y: 155, w: 60, h: 100 },
+      bounds: { x: 316, y: 145, w: 60, h: 100 },
       nodeIds: ["stair_n", "stair_b", "stair_l", "stair_4"],
       on: false,
       timerRemaining: 0,
@@ -607,7 +607,7 @@ export function createPrototypeWorld(): World {
       id: "dev_timer",
       type: "timer_relay",
       title: "Időrelé",
-      bounds: { x: 382, y: 155, w: 64, h: 100 },
+      bounds: { x: 382, y: 145, w: 64, h: 100 },
       nodeIds: ["timer_a1", "timer_15", "timer_18", "timer_16", "timer_a2"],
       on: false,
       relayState: false,
@@ -621,7 +621,7 @@ export function createPrototypeWorld(): World {
       id: "dev_motor_protector",
       type: "motor_protector",
       title: "Motorvédő",
-      bounds: { x: 494, y: 155, w: 60, h: 100 },
+      bounds: { x: 494, y: 145, w: 60, h: 100 },
       nodeIds: [
         "mp_in_l1", "mp_in_l2", "mp_in_l3",
         "mp_out_t1", "mp_out_t2", "mp_out_t3",
@@ -687,12 +687,12 @@ export function createPrototypeWorld(): World {
     },
 
     // 5. Kapcsolók mátrixa a bal oldalon a kiselosztó alatt (3 oszlop, 3 sor + aljzat)
-    // 1. sor (y = 350)
+    // 1. sor (y = 320)
     {
       id: "dev_sw106_1",
       type: "switch_106",
       title: "106 Váltó 1",
-      bounds: { x: 80, y: 350, w: 78, h: 78 },
+      bounds: { x: 80, y: 320, w: 78, h: 78 },
       nodeIds: ["sw106_1_1", "sw106_1_2", "sw106_1_3"],
       on: false,
       pressed: false,
@@ -702,7 +702,7 @@ export function createPrototypeWorld(): World {
       id: "dev_sw107",
       type: "switch_107",
       title: "107 Kereszt",
-      bounds: { x: 180, y: 350, w: 78, h: 78 },
+      bounds: { x: 180, y: 320, w: 78, h: 78 },
       nodeIds: ["sw107_1", "sw107_2", "sw107_3", "sw107_4"],
       on: false,
       pressed: false,
@@ -712,7 +712,7 @@ export function createPrototypeWorld(): World {
       id: "dev_sw106_2",
       type: "switch_106",
       title: "106 Váltó 2",
-      bounds: { x: 280, y: 350, w: 78, h: 78 },
+      bounds: { x: 280, y: 320, w: 78, h: 78 },
       nodeIds: ["sw106_2_1", "sw106_2_2", "sw106_2_3"],
       on: false,
       pressed: false,
@@ -723,19 +723,19 @@ export function createPrototypeWorld(): World {
       id: "dev_socket",
       type: "socket",
       title: "Dugaszolóaljzat",
-      bounds: { x: 385, y: 350, w: 78, h: 78 },
+      bounds: { x: 385, y: 320, w: 78, h: 78 },
       nodeIds: ["sock_l", "sock_n", "sock_pe"],
       on: false,
       pressed: false,
       energized: false,
     },
 
-    // 2. sor (y = 445): 101N nyomókapcsolók
+    // 2. sor (y = 425): 101N nyomókapcsolók
     {
       id: "dev_p101n_1",
       type: "push_switch_101n",
       title: "Nyomó 101N (1)",
-      bounds: { x: 80, y: 445, w: 78, h: 78 },
+      bounds: { x: 80, y: 425, w: 78, h: 78 },
       nodeIds: ["p101n_1_1", "p101n_1_2"],
       on: false,
       pressed: false,
@@ -745,7 +745,7 @@ export function createPrototypeWorld(): World {
       id: "dev_p101n_2",
       type: "push_switch_101n",
       title: "Nyomó 101N (2)",
-      bounds: { x: 180, y: 445, w: 78, h: 78 },
+      bounds: { x: 180, y: 425, w: 78, h: 78 },
       nodeIds: ["p101n_2_1", "p101n_2_2"],
       on: false,
       pressed: false,
@@ -755,19 +755,19 @@ export function createPrototypeWorld(): World {
       id: "dev_p101n_3",
       type: "push_switch_101n",
       title: "Nyomó 101N (3)",
-      bounds: { x: 280, y: 445, w: 78, h: 78 },
+      bounds: { x: 280, y: 425, w: 78, h: 78 },
       nodeIds: ["p101n_3_1", "p101n_3_2"],
       on: false,
       pressed: false,
       energized: false,
     },
 
-    // 3. sor (y = 540): 101, 102, 105 kapcsolók
+    // 3. sor (y = 530): 101, 102, 105 kapcsolók
     {
       id: "dev_sw101",
       type: "switch_101",
       title: "Egypólusú 101",
-      bounds: { x: 80, y: 540, w: 78, h: 78 },
+      bounds: { x: 80, y: 530, w: 78, h: 78 },
       nodeIds: ["sw101_1", "sw101_2"],
       on: false,
       pressed: false,
@@ -777,7 +777,7 @@ export function createPrototypeWorld(): World {
       id: "dev_sw102",
       type: "switch_102",
       title: "Kétpólusú 102",
-      bounds: { x: 180, y: 540, w: 78, h: 78 },
+      bounds: { x: 180, y: 530, w: 78, h: 78 },
       nodeIds: ["sw102_1", "sw102_2", "sw102_3", "sw102_4"],
       on: false,
       pressed: false,
@@ -787,7 +787,7 @@ export function createPrototypeWorld(): World {
       id: "dev_sw105",
       type: "switch_105",
       title: "Csillár 105",
-      bounds: { x: 280, y: 540, w: 78, h: 78 },
+      bounds: { x: 280, y: 530, w: 78, h: 78 },
       nodeIds: ["sw105_1", "sw105_2", "sw105_3"],
       on: false,
       on2: false,
@@ -795,12 +795,12 @@ export function createPrototypeWorld(): World {
       energized: false,
     },
 
-    // 6. Ipari nyomógombok vízszintes dobozsorban (y = 650) a pelda_kotes.jpg mintájára
+    // 6. Ipari nyomógombok vízszintes dobozsorban (y = 635)
     {
       id: "dev_btn_l_no",
       type: "button_no",
       title: "Bal (NO)",
-      bounds: { x: 80, y: 650, w: 66, h: 66 },
+      bounds: { x: 80, y: 635, w: 66, h: 66 },
       nodeIds: ["btn_l_no_3", "btn_l_no_4"],
       on: false,
       pressed: false,
@@ -811,7 +811,7 @@ export function createPrototypeWorld(): World {
       id: "dev_btn_l_nc",
       type: "button_nc",
       title: "Bal (NC)",
-      bounds: { x: 154, y: 650, w: 66, h: 66 },
+      bounds: { x: 154, y: 635, w: 66, h: 66 },
       nodeIds: ["btn_l_nc_1", "btn_l_nc_2"],
       on: false,
       pressed: false,
@@ -822,7 +822,7 @@ export function createPrototypeWorld(): World {
       id: "dev_btn_is1_no",
       type: "button_no",
       title: "Sziget Zöld (NO)",
-      bounds: { x: 232, y: 650, w: 66, h: 66 },
+      bounds: { x: 232, y: 635, w: 66, h: 66 },
       nodeIds: ["btn_is1_no_3", "btn_is1_no_4"],
       on: false,
       pressed: false,
@@ -833,7 +833,7 @@ export function createPrototypeWorld(): World {
       id: "dev_btn_is_nc",
       type: "button_nc",
       title: "Sziget Piros (NC)",
-      bounds: { x: 304, y: 650, w: 66, h: 66 },
+      bounds: { x: 304, y: 635, w: 66, h: 66 },
       nodeIds: ["btn_is_nc_1", "btn_is_nc_2"],
       on: false,
       pressed: false,
@@ -844,7 +844,7 @@ export function createPrototypeWorld(): World {
       id: "dev_btn_is2_no",
       type: "button_no",
       title: "Sziget Zöld (NO)",
-      bounds: { x: 376, y: 650, w: 66, h: 66 },
+      bounds: { x: 376, y: 635, w: 66, h: 66 },
       nodeIds: ["btn_is2_no_3", "btn_is2_no_4"],
       on: false,
       pressed: false,
@@ -855,7 +855,7 @@ export function createPrototypeWorld(): World {
       id: "dev_btn_r_no",
       type: "button_no",
       title: "Jobb (NO)",
-      bounds: { x: 454, y: 650, w: 66, h: 66 },
+      bounds: { x: 454, y: 635, w: 66, h: 66 },
       nodeIds: ["btn_r_no_3", "btn_r_no_4"],
       on: false,
       pressed: false,
@@ -866,7 +866,7 @@ export function createPrototypeWorld(): World {
       id: "dev_btn_r_nc",
       type: "button_nc",
       title: "Jobb (NC)",
-      bounds: { x: 526, y: 650, w: 66, h: 66 },
+      bounds: { x: 526, y: 635, w: 66, h: 66 },
       nodeIds: ["btn_r_nc_1", "btn_r_nc_2"],
       on: false,
       pressed: false,
