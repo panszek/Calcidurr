@@ -88,6 +88,17 @@ body,
   height: 100%;
 }
 
+#toolbar button.highlight-btn {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #38bdf8;
+  font-weight: 700;
+}
+
+#toolbar button.highlight-btn:hover {
+  background: #0369a1;
+}
+
 #toast {
   position: fixed;
   left: 50%;
@@ -99,4 +110,409 @@ body,
   padding: 10px 16px;
   border-radius: 10px;
   max-width: 640px;
+  z-index: 120;
+}
+
+/* =========================================================================
+   MAGYARÁZÓ TÁBLÁZAT (SORKAPOCS-KIOSZTÁSI JEGYZÉK) STÍLUSOK
+   ========================================================================= */
+
+.legend-modal-container {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.legend-modal-container.hidden {
+  display: none !important;
+}
+
+.legend-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.75);
+  backdrop-filter: blur(4px);
+}
+
+/* Modális nézet (Középre rendezett lebegő ablak) */
+.legend-modal-container.modal .legend-window {
+  position: relative;
+  z-index: 2;
+  width: 95vw;
+  max-width: 1750px;
+  height: 88vh;
+  background: #181c24;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: legendFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Dokkolt nézet (Képernyő aljára rögzített lebegő sáv) */
+.legend-modal-container.docked {
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.legend-modal-container.docked .legend-backdrop {
+  display: none;
+}
+
+.legend-modal-container.docked .legend-window {
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+  width: 100vw;
+  height: 48vh;
+  min-height: 340px;
+  background: #181c24;
+  border-top: 2px solid #0284c7;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: legendSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes legendFadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes legendSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* Fejléc */
+.legend-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #11141c;
+  border-bottom: 1px solid #283141;
+}
+
+.legend-title-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.legend-icon {
+  font-size: 24px;
+}
+
+.legend-title-area h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #f8fafc;
+}
+
+.legend-title-area p {
+  margin: 2px 0 0 0;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+.legend-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.legend-toolbar-actions .btn-group {
+  display: flex;
+  align-items: center;
+  background: #202634;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.legend-toolbar-actions button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.legend-toolbar-actions button:hover {
+  background: #2e384d;
+  color: #ffffff;
+}
+
+.legend-toolbar-actions button.active {
+  background: #0284c7;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.legend-toolbar-actions .action-btn {
+  background: #202634;
+  border: 1px solid #334155;
+}
+
+.legend-toolbar-actions .action-btn:hover {
+  background: #2e384d;
+}
+
+.zoom-indicator {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #38bdf8;
+  padding: 0 6px;
+  min-width: 44px;
+  text-align: center;
+  user-select: none;
+}
+
+.close-btn {
+  font-size: 15px !important;
+  background: #2d1818 !important;
+  color: #f87171 !important;
+  border: 1px solid #ef4444 !important;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+}
+
+.close-btn:hover {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+/* Tartalom terület és görgetés */
+.legend-content-viewport {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  background: #0f1218;
+}
+
+.legend-section {
+  background: #151922;
+  border: 1px solid #283141;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 20px;
+}
+
+.legend-section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #283141;
+  padding-bottom: 8px;
+}
+
+.legend-section-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: 0.5px;
+}
+
+.legend-section-desc {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.legend-table-scroll-container {
+  overflow-x: auto;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #11141c;
+}
+
+/* Magyarázó táblázat */
+.legend-table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 11px;
+}
+
+.corner-header {
+  background: #181d27;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px;
+  border: 1px solid #2d3748;
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  text-align: left;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+
+/* Sorszám sor */
+.row-numbers th.cell-number {
+  border: 1px solid #2d3748;
+  padding: 5px 2px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: #161b24;
+  text-align: center;
+  min-width: 28px;
+  user-select: none;
+}
+
+/* Függőleges feliratú felső nagy cella (Eszköz neve) */
+.row-devices th.cell-device {
+  border: 1px solid #2d3748;
+  height: 190px;
+  vertical-align: bottom;
+  padding: 8px 2px;
+  text-align: center;
+  background: #1c222e;
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.cell-device.group-even {
+  background: #1a202c;
+}
+
+.cell-device.group-odd {
+  background: #171c26;
+}
+
+.vertical-device-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #e2e8f0;
+  text-align: left;
+  margin: 0 auto;
+  max-height: 175px;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* Középső sor (Kapocspont jelölése) */
+.row-labels td.cell-label {
+  border: 1px solid #2d3748;
+  padding: 7px 3px;
+  text-align: center;
+  font-size: 11px;
+  color: #f8fafc;
+  background: #1a202c;
+  min-width: 28px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.cell-label.group-even {
+  background: #1a202c;
+}
+
+.cell-label.group-odd {
+  background: #171c26;
+}
+
+/* Alsó sor (Színkód cella) */
+.row-colors td.cell-color {
+  border: 1px solid #2d3748;
+  padding: 6px 3px;
+  text-align: center;
+  background: #131720;
+  min-width: 28px;
+  transition: all 0.15s ease;
+}
+
+/* Színkód négyzetek */
+.swatch-color {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.swatch-black { background: #18181b; }
+.swatch-blue { background: #2563eb; }
+.swatch-red { background: #dc2626; }
+.swatch-green { background: #16a34a; }
+.swatch-yellow { background: #f59e0b; }
+.swatch-white { background: #f8fafc; border: 1px solid #94a3b8 !important; }
+.swatch-brown { background: #78350f; }
+
+.swatch-pe {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  vertical-align: middle;
+  background: linear-gradient(135deg, #16a34a 50%, #facc15 50%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Oszlop kiemelés egérmozgásra */
+.col-highlight {
+  background: #0369a1 !important;
+  color: #ffffff !important;
+}
+
+.row-numbers th.cell-number.col-highlight {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  font-weight: 800;
+}
+
+/* Lábléc */
+.legend-footer {
+  padding: 10px 20px;
+  background: #11141c;
+  border-top: 1px solid #283141;
+}
+
+.legend-info-pill {
+  font-size: 12px;
+  color: #cbd5e1;
+  background: #1a2230;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid #2d3a4f;
+  display: inline-block;
 }

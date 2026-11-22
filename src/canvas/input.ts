@@ -25,15 +25,60 @@ export function hitDevice(world: World, p: Point) {
   });
 }
 
+/**
+ * Ellenőrzi, hogy a kattintás egy sorkapocs előszerelt, fix felső oldalára történt-e.
+ * A felső oldal a fal felé vezet, a diák ide nem köthet vezetéket és nem csavarozhatja.
+ */
+export function hitColumnUpperHalf(world: World, p: Point) {
+  return world.columns.find((col) => {
+    return (
+      p.x >= col.x - 2 &&
+      p.x <= col.x + col.w + 2 &&
+      p.y >= col.y - 25 &&
+      p.y < col.y + 70
+    );
+  });
+}
+
+/**
+ * Megkeresi a csavarhúzó célpontját: az alsó felhasználói csavart vagy alsó kapcsot.
+ */
+export function hitScrewdriverTarget(world: World, p: Point): Port | undefined {
+  // Elsőként a sorkapcsok alsó részét vizsgáljuk (alsó csavar vagy alsó nyílás)
+  for (const col of world.columns) {
+    if (
+      p.x >= col.x - 3 &&
+      p.x <= col.x + col.w + 3 &&
+      p.y >= col.y + 70 &&
+      p.y <= col.y + col.h + 8
+    ) {
+      return world.ports[col.portId];
+    }
+  }
+  // Egyéb csavaros portok vizsgálata
+  return nearestPort(world, p, 18);
+}
+
+/**
+ * Ellenőrzi, hogy a kattintás az oktatófalon lévő magyarázó plakátra esett-e.
+ */
+export function hitLegendPoster(p: Point): boolean {
+  const px = 710;
+  const py = 620;
+  const pw = 1400;
+  const ph = 155;
+  return p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph;
+}
+
 export function hitWagoLever(world: World, p: Point): Port | undefined {
   for (const wago of world.wagos) {
     for (let i = 0; i < wago.portIds.length; i += 1) {
       const pid = wago.portIds[i];
       const closed = world.ports[pid].tight;
-      const lx = wago.x + 22 + i * 52;
-      const ly = wago.y + 28;
-      const lw = 28;
-      const lh = closed ? 18 : 36;
+      const lx = wago.x + 8 + i * 24;
+      const ly = wago.y + 18;
+      const lw = 18;
+      const lh = closed ? 14 : 26;
       if (p.x >= lx && p.x <= lx + lw && p.y >= ly && p.y <= ly + lh) {
         return world.ports[pid];
       }
@@ -51,7 +96,7 @@ function pointToSegment(p: Point, a: Point, b: Point): number {
   return Math.hypot(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
 }
 
-export function hitWire(world: World, p: Point, threshold = 7): Wire | undefined {
+export function hitWire(world: World, p: Point, threshold = 8): Wire | undefined {
   let best: Wire | undefined;
   let bestD = threshold;
   for (const wire of world.wires) {
@@ -73,7 +118,8 @@ export function sampleDraft(points: Point[], next: Point): Point[] {
   return [...points, next];
 }
 
-export function cursorFor(tool: ToolMode): string {
+export function cursorFor(tool: ToolMode, isPanning = false): string {
+  if (isPanning) return "grabbing";
   if (tool === "wire") return "crosshair";
   if (tool === "screwdriver") return "pointer";
   if (tool === "cutter") return "not-allowed";

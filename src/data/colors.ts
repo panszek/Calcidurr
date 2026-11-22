@@ -19,6 +19,9 @@ export const MARK_FILL: Record<ColorMark, string> = {
   blue: "#1d5fb0",
   pe: "#e6c200",
   red: "#c3182c",
+  green: "#2e8b2e",
+  yellow: "#eab308",
+  white: "#f8fafc",
 };
 
 export const SNAP_RADIUS = 15;

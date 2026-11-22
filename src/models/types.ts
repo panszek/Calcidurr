@@ -6,9 +6,39 @@ export type ToolMode = "wire" | "screwdriver" | "hand" | "cutter";
 
 export type PortKind = "screw" | "wago";
 
-export type DeviceType = "mcb" | "switch" | "button" | "contactor" | "lamp";
+export type DeviceType =
+  | "mcb"
+  | "mcb3p"
+  | "mcb1p"
+  | "switch"
+  | "switch_101"
+  | "switch_102"
+  | "switch_105"
+  | "switch_106"
+  | "switch_107"
+  | "push_switch_101n"
+  | "button"
+  | "button_no"
+  | "button_nc"
+  | "contactor"
+  | "motor_protector"
+  | "impulse_relay"
+  | "staircase_relay"
+  | "timer_relay"
+  | "motion_sensor"
+  | "socket"
+  | "lamp";
 
-export type ColorMark = "black" | "brown" | "grey" | "blue" | "pe" | "red";
+export type ColorMark =
+  | "black"
+  | "brown"
+  | "grey"
+  | "blue"
+  | "pe"
+  | "red"
+  | "green"
+  | "yellow"
+  | "white";
 
 export interface Point {
   x: number;
@@ -28,6 +58,7 @@ export interface ElectricalNode {
   deviceName: string;
   functionLabel: string;
   sourcePotential?: Exclude<Potential, "none">;
+  breakerId?: string;
 }
 
 export interface Port {
@@ -65,7 +96,7 @@ export interface WagoBlock {
   nodeId: string;
   x: number;
   y: number;
-  portIds: [string, string, string];
+  portIds: string[];
 }
 
 export interface Device {
@@ -75,8 +106,15 @@ export interface Device {
   bounds: Rect;
   nodeIds: string[];
   on: boolean;
+  on2?: boolean;
   pressed: boolean;
   energized: boolean;
+  timerRemaining?: number;
+  timerActive?: boolean;
+  relayState?: boolean;
+  prevEnergized?: boolean;
+  customLabel?: string;
+  subType?: "no" | "nc";
 }
 
 export interface World {
@@ -96,6 +134,7 @@ export interface SimState {
   shortDetail: string;
   lampOn: Set<string>;
   contactorOn: Set<string>;
+  activeDevices: Set<string>;
   looseCount: number;
   warnings: string[];
 }

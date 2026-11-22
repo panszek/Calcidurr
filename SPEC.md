@@ -72,3 +72,71 @@ Ezek a szabályok a SPEC 1–4. pontjait egészítik ki a megvalósítás során
 - **Zárlat:** egy összefüggő komponensben `L1`+`N` vagy `L1`+`PE`. `N`+`PE` együtt nem számít zárlatnak (nincs ÁVK az MVP-ben).
 - **Csípőfogó:** a vezeték törlése csak akkor sikerül, ha mindkét vég mechanikailag laza; különben rövid hibaüzenet.
 - **Normál mód:** nincs tooltip a kapcsokon. **Debug:** tooltip, élő vezeték fénylése, laza kötések számlálója.
+
+
+## 8. Teljes Iskolai Oktatófal Kiosztás és Bővített Rendszer
+
+A prototípus validációja és a valós fotó (`sources/sorkapocs_kiosztas.png`) analízise alapján a rendszer a teljes iskolai oktatófal hardveres, fizikai és vizuális logikájára bővült.
+
+### 8.1. Sorkapcsok Fizikai Felépítése és Bekötési Logikája:
+- **Test feliratok nélkül:** A sorkapcsok fehér műanyag testén magán **semmilyen szöveg vagy sorszám nem szerepel** (se az eszköz neve, se a kapocs száma, se sorszámozás).
+- **Kétoldalas felépítés:**
+  - **Felső oldal (Előszerelt, gyári bekötés):** A sorkapocs tetejébe gyárilag be van kötve egy rövid vezeték, amely felfelé indul el és belép a fal mögé (átvezető furat). A felső csavar fixen meg van húzva. A kapocs tetején található a gyári színjelölő négyzet (`yellow`, `white`, `brown`, `pe`, `blue`, `red`, `green`, `black`), amely a mögöttes szerelvény vezetékének színét jelzi. A felhasználó a felső oldalhoz **nem köthet vezetéket**, és a felső csavart sem szerelheti (érintéskor tájékoztató figyelmeztetés jelenik meg).
+  - **Alsó oldal (Felhasználói bekötési pont):** Kizárólag a sorkapcsok alsó nyílásába csatlakoztatható felhasználói vezeték, és az alsó csavart kell a csavarhúzó eszközzel meghúzni/kilazítani. (A felső és alsó csatlakozás belsőleg fémesen folytonos csomópontot képez).
+- **Nyomógomb sziget:** A középső nyomógomb állomás **3 gombos** (Zöld NO, Piros NC, Zöld NO), azaz pontosan **6 sorkapcsot** foglal el (nem 8-at).
+
+### 8.2. Különálló Magyarázó Táblázat (Sorkapocs-kiosztási Jegyzék):
+- A falon (vagy lebegő/dokkolt modal ablakban) egy valósághű **Magyarázó Tábla** található, amely 1-az-1-ben tükrözi a két sorkapocssor felépítését sorszámozás nélkül:
+  - **Felső sorkapocssor táblázata:** 21 eszközcsoport, összesen 65 kapocs.
+  - **Alsó sorkapocssor táblázata:** 17 eszközcsoport, összesen 54 kapocs.
+- **Táblázat szerkezete oszloponként (balról jobbra):**
+  - **Felső cella:** Eszköz neve függőlegesen írva (`writing-mode: vertical-rl`), összevonva az eszközhöz tartozó sorkapcsok felett.
+  - **Középső cella:** A kapocspont pontos jelölése (pl. `L1`, `L2`, `A1`, `A2`, `13`, `14`, `NO 3`, `NC 1` stb.).
+  - **Alsó cella:** Színkód jelölőnégyzet.
+- **Interakció:** A Canvas jobb alsó részén elhelyezett miniatűr táblaposzterre vagy a fejléc gombjára kattintva azonnal felugrik a részletes, zoomolható táblázat.
+
+### 8.3. FELSŐ SORKAPOCSSOR (Összesen 65 sorkapocs - balról jobbra):
+1. **3 FÁZIS NULLÁJA:** `N` (Kék)
+2. **3P C16A MEGSZAKÍTÓ:** `L1` (Sárga), `L2` (Sárga), `L3` (Sárga)
+3. **1 FÁZIS NULLÁJA:** `N` (Kék)
+4. **VÉDŐVEZETŐ:** `PE` (Zöld-sárga)
+5. **1P B10A MEGSZAKÍTÓ:** `L1` (Zöld)
+6. **1P B16A MEGSZAKÍTÓ:** `L1` (Piros)
+7. **IMPULZUSRELÉ:** `A1` (Sárga), `A2` (Kék), `1` (Sárga), `2` (Sárga)
+8. **LÉPCSŐHÁZI AUTOMATA:** `N` (Kék), `B` (Barna), `L` (Barna), `4` (Barna)
+9. **IDŐRELÉ:** `A1` (Piros), `15` (Piros), `18` (Piros), `16` (Piros), `A2` (Kék)
+10. **MÁGNESKAPCSOLÓ MK1 (fő bemenet):** `L1` (Sárga), `L2` (Sárga), `L3` (Sárga)
+11. **MÁGNESKAPCSOLÓ MK2 (fő bemenet):** `L1` (Fekete), `L2` (Fekete), `L3` (Fekete)
+12. **MÁGNESKAPCSOLÓ MK3 (fő bemenet):** `L1` (Piros), `L2` (Piros), `L3` (Piros)
+13. **MOTORVÉDŐ (fő bemenet):** `L1` (Barna), `L2` (Barna), `L3` (Barna)
+14. **MÁGNESKAPCSOLÓ MK1 (fő kimenet):** `T1` (Sárga), `T2` (Sárga), `T3` (Sárga)
+15. **MÁGNESKAPCSOLÓ MK2 (fő kimenet):** `T1` (Fekete), `T2` (Fekete), `T3` (Fekete)
+16. **MÁGNESKAPCSOLÓ MK3 (fő kimenet):** `T1` (Piros), `T2` (Piros), `T3` (Piros)
+17. **MOTORVÉDŐ (fő kimenet):** `T1` (Barna), `T2` (Barna), `T3` (Barna)
+18. **MÁGNESKAPCSOLÓ MK1 (segédérintkező + tekercs):** `13` (Sárga), `21` (Sárga), `A1` (Sárga), `14` (Sárga), `22` (Sárga), `A2` (Kék)
+19. **MÁGNESKAPCSOLÓ MK2 (segédérintkező + tekercs):** `13` (Fekete), `21` (Fekete), `A1` (Fekete), `14` (Fekete), `22` (Fekete), `A2` (Kék)
+20. **MÁGNESKAPCSOLÓ MK3 (segédérintkező + tekercs):** `13` (Piros), `21` (Piros), `A1` (Piros), `14` (Piros), `22` (Piros), `A2` (Kék)
+21. **MOTORVÉDŐ (NC segédérintkező):** `95` (Barna), `96` (Barna)
+
+### 8.4. ALSÓ SORKAPOCSSOR (Összesen 54 sorkapocs - balról jobbra):
+1. **DUGASZOLÓALJZAT:** `L` (Sárga), `N` (Kék), `PE` (Zöld-sárga)
+2. **VÁLTÓKAPCSOLÓ 106 (1.):** `1` (Fekete), `2` (Fekete), `3` (Fekete)
+3. **KERESZTVÁLTÓKAPCSOLÓ 107:** `1` (Fehér), `2` (Fehér), `3` (Fehér), `4` (Fehér)
+4. **VÁLTÓKAPCSOLÓ 106 (2.):** `1` (Kék), `2` (Kék), `3` (Kék)
+5. **NYOMÓKAPCSOLÓ 101N (1.):** `1` (Piros), `2` (Piros)
+6. **NYOMÓKAPCSOLÓ 101N (2.):** `1` (Sárga), `2` (Sárga)
+7. **NYOMÓKAPCSOLÓ 101N (3.):** `1` (Zöld), `2` (Zöld)
+8. **EGYPÓLUSÚ KAPCSOLÓ 101:** `1` (Kék), `2` (Kék)
+9. **KÉTPÓLUSÚ KAPCSOLÓ 102:** `1 L` (Piros), `2 L` (Piros), `3 N` (Kék), `4 N` (Kék)
+10. **CSILLÁRKAPCSOLÓ 105:** `1` (Sárga), `2` (Sárga), `3` (Sárga)
+11. **BAL OLDALI NYOMÓGOMBOK:** `NO 3` (Zöld), `NO 4` (Zöld), `NC 1` (Piros), `NC 2` (Piros)
+12. **NYOMÓGOMB SZIGET (3 gombos):** `NO 3` (Zöld), `NO 4` (Zöld), `NC 1` (Piros), `NC 2` (Piros), `NO 3` (Zöld), `NO 4` (Zöld)
+13. **JOBB OLDALI NYOMÓGOMBOK:** `NO 3` (Zöld), `NO 4` (Zöld), `NC 1` (Piros), `NC 2` (Piros)
+14. **IZZÓ 1:** `L` (Barna), `N` (Kék), `PE` (Zöld-sárga)
+15. **IZZÓ 2:** `L` (Zöld), `N` (Kék), `PE` (Zöld-sárga)
+16. **IZZÓ 3:** `L` (Sárga), `N` (Kék), `PE` (Zöld-sárga)
+17. **MOZGÁSÉRZÉKELŐ:** `L↑` (Piros), `N↑` (Kék), `L↓` (Piros)
+
+### 8.5. WAGO ÉS GYAKORLÓTÉR:
+- A két sorkapocssor alatt 5 darab 5-ös Wago összekötő blokk működő, egyenként kattintható emelőkarokkal.
+- A szimulációs motorban mind a 3 fázis, mind a védelmi eszközök (C16A, B10A, B16A, motorvédő), az impulzusrelé, lépcsőházi automata, időrelé, mágneskapcsolók (fő- és segédérintkezők) és fényforrások/érzékelők teljes gráf-alapú logikája implementálva van.

@@ -53,21 +53,116 @@ export function setPortTight(world: World, portId: string, tight: boolean) {
   portById(world, portId).tight = tight;
 }
 
-export function toggleDevice(world: World, deviceId: string) {
+export function toggleDevice(world: World, deviceId: string, subControl?: number) {
   const device = deviceById(world, deviceId);
-  if (device.type === "button") return;
+  if (
+    device.type === "button" ||
+    device.type === "button_no" ||
+    device.type === "button_nc" ||
+    device.type === "push_switch_101n" ||
+    device.type === "lamp" ||
+    device.type === "contactor" ||
+    device.type === "socket"
+  ) {
+    return;
+  }
+
+  if (device.type === "switch_105") {
+    if (subControl === 2) {
+      device.on2 = !device.on2;
+    } else {
+      device.on = !device.on;
+    }
+    return;
+  }
+
+  if (device.type === "motion_sensor") {
+    device.timerRemaining = 5.0;
+    return;
+  }
+
+  if (device.type === "impulse_relay") {
+    device.relayState = !device.relayState;
+    return;
+  }
+
+  if (device.type === "staircase_relay") {
+    device.timerRemaining = (device.timerRemaining && device.timerRemaining > 0) ? 0 : 5.0;
+    return;
+  }
+
   device.on = !device.on;
 }
 
 export function setButtonPressed(world: World, deviceId: string, pressed: boolean) {
   const device = deviceById(world, deviceId);
-  if (device.type !== "button") return;
-  device.pressed = pressed;
+  if (
+    device.type === "button" ||
+    device.type === "button_no" ||
+    device.type === "button_nc" ||
+    device.type === "push_switch_101n"
+  ) {
+    device.pressed = pressed;
+  }
 }
 
-export function tripMcb(world: World) {
-  const mcb = deviceById(world, world.mcbId);
-  mcb.on = false;
+export function tripMcb(world: World, breakerId?: string) {
+  if (breakerId) {
+    const b = world.devices.find((d) => d.id === breakerId);
+    if (b) b.on = false;
+    return;
+  }
+
+  // Trip all active breakers or default
+  const breakers = world.devices.filter(
+    (d) => d.type === "mcb" || d.type === "mcb3p" || d.type === "mcb1p",
+  );
+  if (breakers.length > 0) {
+    for (const b of breakers) {
+      b.on = false;
+    }
+  } else {
+    const mcb = world.devices.find((d) => d.id === world.mcbId);
+    if (mcb) mcb.on = false;
+  }
+}
+
+export function tickWorld(world: World, dt: number): boolean {
+  let changed = false;
+
+  for (const device of world.devices) {
+    if (device.type === "staircase_relay" || device.type === "motion_sensor") {
+      if (device.timerRemaining !== undefined && device.timerRemaining > 0) {
+        device.timerRemaining = Math.max(0, device.timerRemaining - dt);
+        if (device.timerRemaining === 0) {
+          changed = true;
+        }
+      }
+    }
+
+    if (device.type === "timer_relay") {
+      if (device.energized) {
+        if (!device.relayState) {
+          const rem = device.timerRemaining ?? 3.0;
+          if (rem > 0) {
+            device.timerRemaining = Math.max(0, rem - dt);
+            if (device.timerRemaining === 0) {
+              device.relayState = true;
+              changed = true;
+            }
+          }
+        }
+      } else {
+        if (device.relayState || (device.timerRemaining !== 3.0 && device.timerRemaining !== undefined)) {
+          device.relayState = false;
+          device.timerRemaining = 3.0;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  return changed;
 }
 
 export function addWire(
