@@ -30,6 +30,28 @@ export function isPortOccupied(world: World, portId: string, ignoreWireId?: stri
   );
 }
 
+export function hasWagoWires(world: World, wagoId: string): boolean {
+  const wago = world.wagos.find((w) => w.id === wagoId);
+  if (!wago) return false;
+  return world.wires.some(
+    (wire) => wago.portIds.includes(wire.startPortId) || wago.portIds.includes(wire.endPortId),
+  );
+}
+
+export function moveWago(world: World, wagoId: string, x: number, y: number) {
+  const wago = world.wagos.find((w) => w.id === wagoId);
+  if (!wago) return;
+  wago.x = x;
+  wago.y = y;
+  wago.portIds.forEach((pid, index) => {
+    const port = world.ports[pid];
+    if (port) {
+      port.x = x + 18 + index * 24;
+      port.y = y + 46;
+    }
+  });
+}
+
 export function isWireEndSecure(world: World, portId: string): boolean {
   return portById(world, portId).tight;
 }

@@ -1,13 +1,15 @@
 import { MARK_FILL, WIRE_COLORS } from "../data/colors";
 import { UPPER_TERMINAL_GROUPS, LOWER_TERMINAL_GROUPS } from "../data/terminalLegend";
 import { isWireLive } from "../engine/simulation";
-import { isWireEndSecure } from "../models/world";
+import { hasWagoWires, isWireEndSecure } from "../models/world";
 import type { Point, Port, SimState, TerminalColumn, World } from "../models/types";
 
 export interface RenderExtras {
   debug: boolean;
   hoverPortId?: string;
   hoverWireId?: string;
+  hoverWagoId?: string;
+  draggedWagoId?: string;
   draft?: { points: Point[]; color: keyof typeof WIRE_COLORS };
   tooltip?: { x: number; y: number; lines: string[] };
 }
@@ -679,14 +681,30 @@ function drawWago(
   world: World,
   wago: World["wagos"][number],
   hoverPortId?: string,
+  hoverWagoId?: string,
+  draggedWagoId?: string,
 ) {
   const w = 18 + wago.portIds.length * 24;
   const h = 66;
+  const isDragging = draggedWagoId === wago.id;
+  const hasWires = hasWagoWires(world, wago.id);
+  const isHovered = hoverWagoId === wago.id && !hasWires;
+
+  ctx.save();
+  if (isDragging) {
+    ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 6;
+  }
+
   roundRect(ctx, wago.x, wago.y, w, h, 6);
-  ctx.fillStyle = "rgba(240, 242, 245, 0.96)";
+  ctx.fillStyle = isDragging
+    ? "rgba(255, 255, 255, 0.98)"
+    : "rgba(240, 242, 245, 0.96)";
   ctx.fill();
-  ctx.strokeStyle = "#374151";
-  ctx.lineWidth = 1.3;
+  ctx.strokeStyle = isDragging ? "#2563eb" : isHovered ? "#3b82f6" : "#374151";
+  ctx.lineWidth = isDragging || isHovered ? 2 : 1.3;
   ctx.stroke();
 
   // Internal busbar graphic
@@ -697,6 +715,20 @@ function drawWago(
   ctx.font = "800 9.5px Segoe UI, sans-serif";
   ctx.textAlign = "left";
   ctx.fillText("WAGO 221", wago.x + 8, wago.y + 13);
+
+  // If movable (no wires attached), show subtle grip indicator dots at top-right
+  if (!hasWires) {
+    const gripX = wago.x + w - 16;
+    const gripY = wago.y + 7;
+    ctx.fillStyle = isHovered || isDragging ? "#2563eb" : "#9ca3af";
+    for (let gx = 0; gx < 2; gx += 1) {
+      for (let gy = 0; gy < 3; gy += 1) {
+        ctx.beginPath();
+        ctx.arc(gripX + gx * 4.5, gripY + gy * 4, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
 
   wago.portIds.forEach((pid, index) => {
     const port = world.ports[pid];
@@ -725,6 +757,8 @@ function drawWago(
     ctx.fillStyle = "#f59e0b";
     ctx.fill();
   });
+
+  ctx.restore();
 }
 
 function drawDevices(ctx: CanvasRenderingContext2D, world: World, sim: SimState) {
@@ -1221,7 +1255,7 @@ export function renderWorld(
   }
 
   for (const wago of world.wagos) {
-    drawWago(ctx, world, wago, extras.hoverPortId);
+    drawWago(ctx, world, wago, extras.hoverPortId, extras.hoverWagoId, extras.draggedWagoId);
   }
 
   // Devices

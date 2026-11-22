@@ -87,6 +87,14 @@ export function hitWagoLever(world: World, p: Point): Port | undefined {
   return undefined;
 }
 
+export function hitWago(world: World, p: Point) {
+  return world.wagos.find((wago) => {
+    const w = 18 + wago.portIds.length * 24;
+    const h = 66;
+    return p.x >= wago.x && p.x <= wago.x + w && p.y >= wago.y && p.y <= wago.y + h;
+  });
+}
+
 function pointToSegment(p: Point, a: Point, b: Point): number {
   const vx = b.x - a.x;
   const vy = b.y - a.y;

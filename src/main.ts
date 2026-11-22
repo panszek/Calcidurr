@@ -6,6 +6,7 @@ import {
   hitDevice,
   hitLegendPoster,
   hitScrewdriverTarget,
+  hitWago,
   hitWagoLever,
   hitWire,
   nearestPort,
@@ -16,11 +17,13 @@ import { LegendTableViewer } from "./canvas/legendTable";
 import { WIRE_COLORS } from "./data/colors";
 import { createPrototypeWorld } from "./data/prototypeTrack";
 import { portPotential, simulate } from "./engine/simulation";
-import type { SimState, ToolMode, WireColorId, World } from "./models/types";
+import type { Port, SimState, ToolMode, WireColorId, World } from "./models/types";
 import {
   addWire,
+  hasWagoWires,
   isPortOccupied,
   isWireRemovable,
+  moveWago,
   removeWire,
   setButtonPressed,
   tickWorld,
@@ -44,6 +47,18 @@ let debug = false;
 let draft: DraftWire | undefined;
 let hoverPortId: string | undefined;
 let hoverWireId: string | undefined;
+let hoveredWagoId: string | undefined;
+let draggedWago:
+  | {
+      id: string;
+      startX: number;
+      startY: number;
+      ox: number;
+      oy: number;
+      moved: boolean;
+    }
+  | undefined;
+let pendingLeverPort: Port | undefined;
 let pressedButtonId: string | undefined;
 let toastTimer = 0;
 
@@ -210,6 +225,8 @@ function draw() {
     debug,
     hoverPortId,
     hoverWireId,
+    hoverWagoId: hoveredWagoId,
+    draggedWagoId: draggedWago?.id,
     draft: draft ? { points: draft.points, color: draft.color } : undefined,
     tooltip: hoverPortId ? tooltipForPort(hoverPortId) : undefined,
   });
@@ -265,6 +282,24 @@ canvas.addEventListener("pointerdown", (event) => {
 
     const port = nearestPort(world, p);
     if (!port) {
+      const clickedWago = hitWago(world, p);
+      if (clickedWago) {
+        if (!hasWagoWires(world, clickedWago.id)) {
+          draggedWago = {
+            id: clickedWago.id,
+            startX: p.x,
+            startY: p.y,
+            ox: p.x - clickedWago.x,
+            oy: p.y - clickedWago.y,
+            moved: false,
+          };
+          draw();
+          return;
+        }
+        showToast("Bekötött WAGO nem mozgatható! Előbb kösd ki a vezetékeket.");
+        return;
+      }
+
       // Clicked on empty space: start panning
       isPanning = true;
       panStart = {
@@ -310,10 +345,34 @@ canvas.addEventListener("pointerdown", (event) => {
   }
 
   if (tool === "hand") {
-    const lever = hitWagoLever(world, p);
-    if (lever) {
-      togglePortTight(world, lever.id);
-      runSim();
+    const clickedWago = hitWago(world, p);
+    if (clickedWago) {
+      const isWired = hasWagoWires(world, clickedWago.id);
+      const lever = hitWagoLever(world, p);
+
+      if (isWired) {
+        if (lever) {
+          togglePortTight(world, lever.id);
+          runSim();
+          draw();
+          return;
+        }
+        showToast("Bekötött WAGO nem mozgatható! Előbb kösd ki a vezetékeket.");
+        return;
+      }
+
+      // Üres wago mozgatható
+      if (lever) {
+        pendingLeverPort = lever;
+      }
+      draggedWago = {
+        id: clickedWago.id,
+        startX: p.x,
+        startY: p.y,
+        ox: p.x - clickedWago.x,
+        oy: p.y - clickedWago.y,
+        moved: false,
+      };
       draw();
       return;
     }
@@ -394,10 +453,52 @@ canvas.addEventListener("pointermove", (event) => {
   }
 
   const p = eventPoint(event);
+
+  if (draggedWago) {
+    const distFromStart = Math.hypot(p.x - draggedWago.startX, p.y - draggedWago.startY);
+    if (distFromStart > 4) {
+      draggedWago.moved = true;
+      pendingLeverPort = undefined;
+    }
+    if (draggedWago.moved) {
+      const wago = world.wagos.find((w) => w.id === draggedWago!.id);
+      if (wago) {
+        const w = 18 + wago.portIds.length * 24;
+        const nx = Math.max(10, Math.min(LOGICAL.w - w - 10, p.x - draggedWago.ox));
+        const ny = Math.max(10, Math.min(LOGICAL.h - 76, p.y - draggedWago.oy));
+        moveWago(world, draggedWago.id, nx, ny);
+      }
+      canvas.style.cursor = "grabbing";
+      draw();
+      return;
+    }
+  }
+
   hoverPortId = (tool === "screwdriver" ? hitScrewdriverTarget(world, p) : nearestPort(world, p))?.id;
   hoverWireId = hitWire(world, p, 9)?.id;
+  const hoveredWago = hitWago(world, p);
+  hoveredWagoId = hoveredWago?.id;
+
   if (hitLegendPoster(p)) {
     canvas.style.cursor = "pointer";
+  } else if (tool === "hand") {
+    if (hitWagoLever(world, p)) {
+      canvas.style.cursor = "pointer";
+    } else if (hoveredWago && !hasWagoWires(world, hoveredWago.id)) {
+      canvas.style.cursor = "grab";
+    } else if (hitDevice(world, p)) {
+      canvas.style.cursor = "pointer";
+    } else {
+      canvas.style.cursor = cursorFor(tool, isPanning);
+    }
+  } else if (tool === "wire") {
+    if (nearestPort(world, p)) {
+      canvas.style.cursor = "crosshair";
+    } else if (hoveredWago && !hasWagoWires(world, hoveredWago.id)) {
+      canvas.style.cursor = "grab";
+    } else {
+      canvas.style.cursor = cursorFor(tool, isPanning);
+    }
   } else {
     canvas.style.cursor = cursorFor(tool, isPanning);
   }
@@ -436,6 +537,18 @@ canvas.addEventListener("pointerup", (event) => {
     isPanning = false;
     canvas.style.cursor = cursorFor(tool);
   }
+
+  if (draggedWago) {
+    if (!draggedWago.moved && pendingLeverPort) {
+      togglePortTight(world, pendingLeverPort.id);
+      runSim();
+    }
+    draggedWago = undefined;
+    pendingLeverPort = undefined;
+    canvas.style.cursor = cursorFor(tool);
+    draw();
+  }
+
   const p = eventPoint(event);
   if (draft) finishDraft(p);
   if (pressedButtonId) {
@@ -450,8 +563,13 @@ canvas.addEventListener("pointerleave", () => {
   if (isPanning) {
     isPanning = false;
   }
+  if (draggedWago) {
+    draggedWago = undefined;
+    pendingLeverPort = undefined;
+  }
   hoverPortId = undefined;
   hoverWireId = undefined;
+  hoveredWagoId = undefined;
   draw();
 });
 
@@ -505,6 +623,9 @@ toolbar.addEventListener("click", (event) => {
   if (target.closest("[data-reset]")) {
     world = createPrototypeWorld();
     draft = undefined;
+    draggedWago = undefined;
+    pendingLeverPort = undefined;
+    hoveredWagoId = undefined;
     runSim();
     paintToolbar();
     draw();
