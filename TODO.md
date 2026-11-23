@@ -4,8 +4,12 @@
 - ÁVK-k müködő tesztgombal
 - lakatfogó az áramfelvétel méréshez
 - használt kábel szin helyesség ellenörzés
+- szöveg helyett eszközök, tekercsek, szerszámok
 
 # Hibák, javitandók
-- [x] mozgatható wago (üresen húzással szabadon mozgatható, bekötve rögzített)
 - kismegszakitó lekapcsolva kezdjen
 - fura sorkapocs csavar viselkedés
+- wago:
+    - 3as wago
+    - új wago dobozból
+    - visszadobható wago
