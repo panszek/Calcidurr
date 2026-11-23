@@ -2,10 +2,11 @@ import { MARK_FILL, WIRE_COLORS } from "../data/colors";
 import { UPPER_TERMINAL_GROUPS, LOWER_TERMINAL_GROUPS } from "../data/terminalLegend";
 import { isWireLive } from "../engine/simulation";
 import { hasWagoWires, isWireEndSecure } from "../models/world";
-import type { Point, Port, SimState, TerminalColumn, World } from "../models/types";
+import type { Point, Port, SimState, TerminalColumn, ToolMode, World } from "../models/types";
 
 export interface RenderExtras {
   debug: boolean;
+  tool?: ToolMode;
   hoverPortId?: string;
   hoverWireId?: string;
   hoverWagoId?: string;
@@ -472,6 +473,7 @@ function drawColumn(
   col: TerminalColumn,
   port: Port,
   hover: boolean,
+  isScrewdriverHover: boolean,
   debug: boolean,
 ) {
   ctx.save();
@@ -539,11 +541,12 @@ function drawColumn(
 
   // 2. SORKAPOCS TEST (Moduláris DIN sorkapocs test)
   // A sorkapocs magán a testén NEM tartalmaz szöveges vagy számozott feliratot!
+  const isGeneralHover = hover && !isScrewdriverHover;
   roundRect(ctx, col.x, col.y, col.w, col.h, 3);
-  ctx.fillStyle = hover ? "#ffffff" : "#eeeae2";
+  ctx.fillStyle = isGeneralHover ? "#ffffff" : "#eeeae2";
   ctx.fill();
-  ctx.strokeStyle = hover ? "#0284c7" : "#374151";
-  ctx.lineWidth = hover ? 1.5 : 1;
+  ctx.strokeStyle = isGeneralHover ? "#0284c7" : "#374151";
+  ctx.lineWidth = isGeneralHover ? 1.5 : 1;
   ctx.stroke();
 
   // Oldalsó sorolási osztóhornyok
@@ -625,23 +628,45 @@ function drawColumn(
   // 4. ALSÓ RÉSZ KIALAKÍTÁSA:
   // a) Felhasználói alsó csavar (csavarhúzóval meghúzható/lazítható)
   const userScrewY = col.y + 92;
+
+  // Csavarhúzó hover kiemelő gyűrű a csavarfej körül
+  if (isScrewdriverHover) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, userScrewY, 11, 0, Math.PI * 2);
+    ctx.strokeStyle = "#0284c7";
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([3, 2]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.beginPath();
   ctx.arc(cx, userScrewY, 7.5, 0, Math.PI * 2);
-  ctx.fillStyle = hover ? "#f1f5f9" : "#cbd5e1";
+  ctx.fillStyle = isScrewdriverHover
+    ? "#f8fafc"
+    : port.tight
+      ? "#cbd5e1"
+      : "#e2e8f0";
   ctx.fill();
-  ctx.strokeStyle = hover ? "#0284c7" : "#475569";
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = isScrewdriverHover
+    ? "#0284c7"
+    : port.tight
+      ? "#475569"
+      : "#64748b";
+  ctx.lineWidth = isScrewdriverHover ? 1.5 : 1.2;
   ctx.stroke();
 
   ctx.beginPath();
   ctx.arc(cx, userScrewY, 5, 0, Math.PI * 2);
-  ctx.fillStyle = "#94a3b8";
+  ctx.fillStyle = port.tight ? "#94a3b8" : "#cbd5e1";
   ctx.fill();
 
-  // Alsó csavarhorony: elforog a meghúzási állapottól függően
+  // Alsó csavarhorony: a felső gyárilag meghúzott csavarral megegyezően vízszintes (0) meghúzva,
+  // laza (tight: false) állapotban 90 fokkal elforgatva (Math.PI / 2 / függőleges)
   ctx.save();
   ctx.translate(cx, userScrewY);
-  ctx.rotate(port.tight ? Math.PI / 2 : 0);
+  ctx.rotate(port.tight ? 0 : Math.PI / 2);
   ctx.strokeStyle = "#0f172a";
   ctx.lineWidth = 1.8;
   ctx.beginPath();
@@ -655,13 +680,15 @@ function drawColumn(
   roundRect(ctx, col.x + 3.5, holeBottomY, col.w - 7, 20, 3);
   ctx.fillStyle = "#1e242c";
   ctx.fill();
-  ctx.strokeStyle = hover ? "#0284c7" : "#475569";
+  ctx.strokeStyle = isGeneralHover ? "#0284c7" : "#475569";
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Belső réz rögzítőlemez
-  const tongueY = port.tight ? holeBottomY + 3 : holeBottomY + 7;
-  ctx.fillStyle = "#d97706";
+  // Belső réz rögzítőlemez (kengyel)
+  // Meghúzva (tight: true) fent rögzít (holeBottomY + 3)
+  // Lazítva (tight: false) lentebb áll (holeBottomY + 11), nyitott kengyelt jelezve
+  const tongueY = port.tight ? holeBottomY + 3 : holeBottomY + 11;
+  ctx.fillStyle = port.tight ? "#d97706" : "#f59e0b";
   ctx.fillRect(col.x + 5.5, tongueY, col.w - 11, 3);
 
   // Csak Debug módban írja ki a sorkapocs jelölését (Gyakorló módban SEMMI nem jelenik meg!)
@@ -1251,7 +1278,11 @@ export function renderWorld(
   // Terminals and wagos
   for (const col of world.columns) {
     const port = world.ports[col.portId];
-    if (port) drawColumn(ctx, col, port, extras.hoverPortId === port.id, extras.debug);
+    if (port) {
+      const isHovered = extras.hoverPortId === port.id;
+      const isScrewdriverHover = isHovered && extras.tool === "screwdriver";
+      drawColumn(ctx, col, port, isHovered, isScrewdriverHover, extras.debug);
+    }
   }
 
   for (const wago of world.wagos) {

@@ -41,22 +41,54 @@ export function hitColumnUpperHalf(world: World, p: Point) {
 }
 
 /**
- * Megkeresi a csavarhúzó célpontját: az alsó felhasználói csavart vagy alsó kapcsot.
+ * Megkeresi a csavarhúzó célpontját: pontosan a legközelebbi alsó csavarfej-középpontot
+ * (cx, col.y + 92) az osztás felén belül (|dx| <= 10.5, |dy| <= 14).
+ * Megszünteti a korábbi átfedéseket és a téves fallback találatokat.
  */
 export function hitScrewdriverTarget(world: World, p: Point): Port | undefined {
-  // Elsőként a sorkapcsok alsó részét vizsgáljuk (alsó csavar vagy alsó nyílás)
+  let bestPort: Port | undefined;
+  let bestDist = Infinity;
+
   for (const col of world.columns) {
-    if (
-      p.x >= col.x - 3 &&
-      p.x <= col.x + col.w + 3 &&
-      p.y >= col.y + 70 &&
-      p.y <= col.y + col.h + 8
-    ) {
-      return world.ports[col.portId];
+    const cx = col.x + col.w / 2;
+    const cy = col.y + 92;
+    const dx = Math.abs(p.x - cx);
+    const dy = Math.abs(p.y - cy);
+    if (dx <= 10.5 && dy <= 14) {
+      const d = Math.hypot(p.x - cx, p.y - cy);
+      if (d < bestDist) {
+        bestDist = d;
+        bestPort = world.ports[col.portId];
+      }
     }
   }
-  // Egyéb csavaros portok vizsgálata
-  return nearestPort(world, p, 18);
+
+  return bestPort;
+}
+
+/**
+ * Ellenőrzi, hogy a pont egy sorkapocs alsó felhasználói felére esik-e
+ * (alsó csavar vagy alsó vezetéknyílás környéke: |dx| <= 11 és y >= col.y + 70 && y <= col.y + col.h + 8).
+ * Megszünteti a holtzónát vezetékezés közben, hogy a kattintás ne váltson véletlen vászonhúzásra (pan).
+ */
+export function hitColumnLowerHalf(world: World, p: Point) {
+  let bestCol: (typeof world.columns)[number] | undefined;
+  let bestDist = Infinity;
+
+  for (const col of world.columns) {
+    const cx = col.x + col.w / 2;
+    const cy = col.y + 102;
+    const dx = Math.abs(p.x - cx);
+    if (dx <= 11 && p.y >= col.y + 70 && p.y <= col.y + col.h + 8) {
+      const d = Math.hypot(p.x - cx, p.y - cy);
+      if (d < bestDist) {
+        bestDist = d;
+        bestCol = col;
+      }
+    }
+  }
+
+  return bestCol;
 }
 
 /**

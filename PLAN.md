@@ -275,12 +275,23 @@ flowchart LR
     T7 --> T8["8. szál: Grafikus UI<br/>(Eszközök, tekercsek, szerszámok)"]
 ```
 
-- **0. szál (Teszt-alapok):** Vitest konfigurálása és a meglévő működés regressziós tesztjeinek megírása (`simulation.test.ts`, `world.test.ts`, `input.test.ts`).
-- **1. szál (Hibajavítások):** 7. pont (minden `KI`-ben indul) + 8. pont (sorkapocs csavar viselkedés) + bónusz: `src/canvas/legendTable.ts` `56 db → 54 db` elírás javítása + tesztek bővítése.
-- **2. szál (Wago):** 9. pont (3-as és 5-ös Wago, `fixed` flag előkészítése, dobozból kihúzás a munkapad végleges zónájában, visszadobás) + `wago.test.ts`.
-- **3. szál (ÁVK-k):** 3. pont (4P és 2P ÁVK a kiselosztóban, működő `T` tesztgomb, upstream védelem és hibaáram-leoldás) + `rcd.test.ts`.
-- **4. szál (3F Villanymotor):** 1. pont (3F motor animációval + poszter alatti 6+1 fix 3-as WAGO fekete/zöld-sárga kábelköteggel és fehér szigszalag feliratokkal) + `motor.test.ts`.
-- **5. szál (Kábelszín validáció):** 5. pont (fekete / kék / zöld-sárga szabályrendszer + hibaösszesítő és Canvas kiemelés) + `colorCheck.test.ts`.
-- **6. szál (UNI-T vizsgáló):** 2. pont (feszültség- és folytonosságvizsgáló + hang + közös lebegő műszerpanel) + `measurements.test.ts`.
-- **7. szál (Lakatfogó):** 4. pont (fázor áramhálózat-megoldó + lakatfogó pofa és kijelző) + `currentSolver.test.ts`.
-- **8. szál (Grafikus eszközök, tekercsek, szerszámok):** 6. pont (szöveg nélküli SVG eszköztár + teljes interaktív munkapad + egyedi kurzorok).
+- [x] **0. szál (Teszt-alapok) — KÉSZ:** Vitest (`^3.2.7`) telepítve és konfigurálva (`package.json`: `npm test`, `npm run test:watch`), regressziós tesztek elkészítve és zöldre futtatva (`29/29` teszt + `npm run build` sikeres):
+  - `src/__tests__/testHelpers.ts` — bekötő és tápbekapcsoló segédfüggvények (`createTestWorld`, `enableSupply`, `connectNodes`, `connectPorts`).
+  - `src/__tests__/world.test.ts` (7 teszt) — sorkapocs/legend konzisztencia (`65 + 54 = 119`), `cloneWorld`, vezeték foglaltság/eltávolíthatóság, Wago mozgatás, kapcsolók/relék/gombok, `tripMcb`, `tickWorld`.
+  - `src/__tests__/simulation.test.ts` (17 teszt) — laza/meghúzott kötések, dugalj, Wago párhuzamos elosztás, `101`/`102`/`105`/`106+107+106`/`101N` kapcsolók, `MK1` öntartás Start/Stop nyomógombokkal, motorvédő, impulzusrelé, lépcsőházi automata, időrelé, mozgásérzékelő, `L1–N` / `L1–PE` / `L1–L2` zárlatvédelem.
+  - `src/__tests__/input.test.ts` (5 teszt) — `dist`, `sampleDraft`, `nearestPort`, felső/alsó sorkapocs elválasztás, Wago test/karok, eszköz/vezeték/plakát hit-test és kurzorok.
+- [x] **1. szál (Hibajavítások) — KÉSZ:** Minden induló állapot és sorkapocs csavar viselkedés javítva, Vitest tesztek zöldek (`34/34` teszt + `npm run build` sikeres):
+  - **Minden eszköz `KI` (`on: false`) állapotban indul:** `mcb_3p`, `mcb_1p_b10`, `mcb_1p_b16`, `dev_motor_protector` alapból lekapcsolva jön létre és resetkor is így áll vissza; induláskor nulla fázisfeszültség van a kapcsokon (csak passzív `PE` és `N` él).
+  - **Üres sorkapcsok kilazítva indulnak (`tight: false`):** a tanuló azonnal bekötheti a vezetéket kézi előzetes kicsavarás nélkül, majd csavarhúzóval meghúzhatja.
+  - **Átfedésmentes csavarhitbox (`src/canvas/input.ts`):** `hitScrewdriverTarget` pontosan a legközelebbi csavarfej-középpontot (`cx`, `col.y + 92`) találja el az osztás felén belül (`|dx| <= 10.5`, `|dy| <= 14`), szomszédos csavarok bal/jobb szélén sincs átfedés, fallback eltávolítva.
+  - **Egységes csavarrajz és vizuális állapotok (`src/canvas/renderer.ts`):** a felső és alsó meghúzott (`tight: true`) csavarok horonyiránya egységesen vízszintes (0°); laza (`tight: false`) állapotban 90°-kal elfordítva (függőleges) világosabb fejjel és nyitott réz kengyellel jelenik meg. Csavarhúzó eszköznél a célzott csavarfej köré kiemelő szaggatott gyűrű rajzolódik.
+  - **Holtzóna és visszajelzés javítások (`src/canvas/input.ts`, `src/main.ts`):** új `hitColumnLowerHalf` megakadályozza a véletlen pan (vászonhúzás) indítását sorkapocs alsó részére kattintáskor; csavarhúzóval WAGO-ra kattintva toast figyelmeztet a Kéz eszköz használatára.
+  - **Elírás javítása:** `src/canvas/legendTable.ts` és `src/data/prototypeTrack.ts` `56 db → 54 db` sorkapocs javítva.
+  - **Tesztek:** `src/__tests__/prototypeTrack.test.ts` (4 teszt: OFF állapotok, laza csavarok, 0V feszültség, kapcsolható kimenetek) létrehozva, `src/__tests__/input.test.ts` bővítve szomszédos csavarhatárok és alsó oszlop hit-testekkel.
+- [ ] **2. szál (Wago):** 9. pont (3-as és 5-ös Wago, `fixed` flag előkészítése, dobozból kihúzás a munkapad végleges zónájában, visszadobás) + `wago.test.ts`.
+- [ ] **3. szál (ÁVK-k):** 3. pont (4P és 2P ÁVK a kiselosztóban, működő `T` tesztgomb, upstream védelem és hibaáram-leoldás) + `rcd.test.ts`.
+- [ ] **4. szál (3F Villanymotor):** 1. pont (3F motor animációval + poszter alatti 6+1 fix 3-as WAGO fekete/zöld-sárga kábelköteggel és fehér szigszalag feliratokkal) + `motor.test.ts`.
+- [ ] **5. szál (Kábelszín validáció):** 5. pont (fekete / kék / zöld-sárga szabályrendszer + hibaösszesítő és Canvas kiemelés) + `colorCheck.test.ts`.
+- [ ] **6. szál (UNI-T vizsgáló):** 2. pont (feszültség- és folytonosságvizsgáló + hang + közös lebegő műszerpanel) + `measurements.test.ts`.
+- [ ] **7. szál (Lakatfogó):** 4. pont (fázor áramhálózat-megoldó + lakatfogó pofa és kijelző) + `currentSolver.test.ts`.
+- [ ] **8. szál (Grafikus eszközök, tekercsek, szerszámok):** 6. pont (szöveg nélküli SVG eszköztár + teljes interaktív munkapad + egyedi kurzorok).

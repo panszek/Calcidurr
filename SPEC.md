@@ -50,6 +50,9 @@ A kód a következő modulokra oszlik (Vite + TypeScript, böngészőben Canvas)
 - `src/data/` — pályaadatok.
   - `colors.ts` — vezeték- és jelölőszínek.
   - `prototypeTrack.ts` — az MVP tesztpálya koordinátái és csomópontjai.
+- `src/__tests__/` — Vitest automatizált unit és szimulációs regressziós tesztek (`npm test`).
+  - `testHelpers.ts` — újrahasznosítható bekötő és tápkapcsoló segédfüggvények.
+  - `world.test.ts`, `simulation.test.ts`, `input.test.ts`, `prototypeTrack.test.ts` — világmutációk, áramköri szimuláció, kezdőállapotok és Canvas hit-testek ellenőrzése.
 
 ## 6. Vizuális referenciák
 A `sources/` mappa a valós oktatófalat dokumentálja:
@@ -62,7 +65,9 @@ A prototípus **nem** a teljes falat másolja, csak a 4. pont elemeit, de a sork
 Ezek a szabályok a SPEC 1–4. pontjait egészítik ki a megvalósítás során:
 
 - Egy kapocspontba / Wago nyílásba **egyszerre egy vezetékvég** köthető.
-- Új vezeték rögzítésekor a két végpont **automatikusan meglazul** (sorkapocsnál csavar ki, Wago-nál kar fel), a tanulónak meg kell húznia / le kell hajtania a kart.
+- **Kezdőállapot:** Az oktatófal mindig teljesen **kikapcsolt (`on: false`)** állapotban indul (minden kismegszakító, motorvédő és kapcsoló KI állásban van), a sorkapcsok feszültségmentesek.
+- **Ergonomikus csavarviselkedés:** Az üres sorkapcsok alapból **kilazított (`tight: false`)** állapotban várják a bekötést, így a tanulónak nem kell előre kitekernie a csavart a vezeték rögzítéséhez. Új vezeték bekötése után a csatlakozási pont laza marad, amit a tanulónak a Csavarhúzóval meg kell húznia (`tight: true`).
+- **Csavarok megjelenése:** A felső fix és az alsó meghúzott csavar horonyiránya egységesen vízszintes (0°); laza állapotban 90°-kal elfordul (függőleges), világosabb fejjel és nyitott réz kengyellel. Csavarhúzó hover esetén célzott kiemelő gyűrű jelenik meg a csavarfej körül.
 - A Wago 3 nyílása **közös elektromos csomópont**: a zárt karú, bekötött erek párhuzamosan kötnek.
 - **Kismegszakító (`1P B10A`):** kéz eszközzel BE/KI. Csak BE állásban a `L1` sorkapocs tápforrás. Zárlatkor automatikus leoldás + hibaüzenet.
 - **Egypólusú kapcsoló:** kattintásra billen, zárva belső él `1–2` között.

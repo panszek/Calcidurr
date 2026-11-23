@@ -2,6 +2,7 @@ import "./style.css";
 import { renderWorld } from "./canvas/renderer";
 import {
   cursorFor,
+  hitColumnLowerHalf,
   hitColumnUpperHalf,
   hitDevice,
   hitLegendPoster,
@@ -223,6 +224,7 @@ function draw() {
   ctx.setTransform(dpr * view.scale, 0, 0, dpr * view.scale, dpr * view.ox, dpr * view.oy);
   renderWorld(ctx, world, sim, {
     debug,
+    tool,
     hoverPortId,
     hoverWireId,
     hoverWagoId: hoveredWagoId,
@@ -280,7 +282,14 @@ canvas.addEventListener("pointerdown", (event) => {
       return;
     }
 
-    const port = nearestPort(world, p);
+    let port = nearestPort(world, p);
+    if (!port) {
+      const lowerCol = hitColumnLowerHalf(world, p);
+      if (lowerCol) {
+        port = world.ports[lowerCol.portId];
+      }
+    }
+
     if (!port) {
       const clickedWago = hitWago(world, p);
       if (clickedWago) {
@@ -324,6 +333,11 @@ canvas.addEventListener("pointerdown", (event) => {
     const upperCol = hitColumnUpperHalf(world, p);
     if (upperCol) {
       showToast("A felső csavar gyárilag meg van húzva és fix. Csak az alsó csavart tudod meghúzni/lazítani!");
+      return;
+    }
+
+    if (hitWago(world, p)) {
+      showToast("A WAGO rugós karos rögzítésű: a karok mozgatásához válaszd a Kéz eszközt!");
       return;
     }
 
@@ -475,6 +489,10 @@ canvas.addEventListener("pointermove", (event) => {
   }
 
   hoverPortId = (tool === "screwdriver" ? hitScrewdriverTarget(world, p) : nearestPort(world, p))?.id;
+  if (!hoverPortId && tool === "wire") {
+    const lowerCol = hitColumnLowerHalf(world, p);
+    if (lowerCol) hoverPortId = lowerCol.portId;
+  }
   hoverWireId = hitWire(world, p, 9)?.id;
   const hoveredWago = hitWago(world, p);
   hoveredWagoId = hoveredWago?.id;
@@ -492,7 +510,7 @@ canvas.addEventListener("pointermove", (event) => {
       canvas.style.cursor = cursorFor(tool, isPanning);
     }
   } else if (tool === "wire") {
-    if (nearestPort(world, p)) {
+    if (nearestPort(world, p) || hitColumnLowerHalf(world, p)) {
       canvas.style.cursor = "crosshair";
     } else if (hoveredWago && !hasWagoWires(world, hoveredWago.id)) {
       canvas.style.cursor = "grab";
@@ -504,7 +522,11 @@ canvas.addEventListener("pointermove", (event) => {
   }
 
   if (draft) {
-    const snap = nearestPort(world, p);
+    let snap = nearestPort(world, p);
+    if (!snap) {
+      const lowerCol = hitColumnLowerHalf(world, p);
+      if (lowerCol) snap = world.ports[lowerCol.portId];
+    }
     const target =
       snap && snap.id !== draft.startPortId && !isPortOccupied(world, snap.id)
         ? { x: snap.x, y: snap.y }
@@ -516,7 +538,11 @@ canvas.addEventListener("pointermove", (event) => {
 
 function finishDraft(p: { x: number; y: number }) {
   if (!draft) return;
-  const end = nearestPort(world, p);
+  let end = nearestPort(world, p);
+  if (!end) {
+    const lowerCol = hitColumnLowerHalf(world, p);
+    if (lowerCol) end = world.ports[lowerCol.portId];
+  }
   if (
     end &&
     end.id !== draft.startPortId &&

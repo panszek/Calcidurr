@@ -29,8 +29,9 @@ function port(
   x: number,
   y: number,
   label: string,
+  tight = false,
 ): Port {
-  return { id, nodeId, kind, x, y, label, tight: true };
+  return { id, nodeId, kind, x, y, label, tight };
 }
 
 function column(
@@ -155,7 +156,7 @@ export function createPrototypeWorld(): World {
     mp_95: node("mp_95", "Motorvédő segédérintkező", "95 NC", "95"),
     mp_96: node("mp_96", "Motorvédő segédérintkező", "96 NC", "96"),
 
-    // ALSÓ SORKAPOCSSOR (56 db)
+    // ALSÓ SORKAPOCSSOR (54 db)
     // 1. Dugaszolóaljzat: [L, N, PE]
     sock_l: node("sock_l", "Dugaszolóaljzat", "L pont", "L"),
     sock_n: node("sock_n", "Dugaszolóaljzat", "N pont", "N"),
@@ -552,7 +553,7 @@ export function createPrototypeWorld(): World {
       title: "3P C16A",
       bounds: { x: 100, y: 145, w: 72, h: 100 },
       nodeIds: ["mcb3_l1", "mcb3_l2", "mcb3_l3"],
-      on: true,
+      on: false,
       pressed: false,
       energized: false,
     },
@@ -563,7 +564,7 @@ export function createPrototypeWorld(): World {
       title: "1P B10A",
       bounds: { x: 178, y: 145, w: 32, h: 100 },
       nodeIds: ["mcb1_b10_l1"],
-      on: true,
+      on: false,
       pressed: false,
       energized: false,
     },
@@ -574,7 +575,7 @@ export function createPrototypeWorld(): World {
       title: "1P B16A",
       bounds: { x: 214, y: 145, w: 32, h: 100 },
       nodeIds: ["mcb1_b16_l1"],
-      on: true,
+      on: false,
       pressed: false,
       energized: false,
     },
@@ -627,7 +628,7 @@ export function createPrototypeWorld(): World {
         "mp_out_t1", "mp_out_t2", "mp_out_t3",
         "mp_95", "mp_96",
       ],
-      on: true,
+      on: false,
       pressed: false,
       energized: false,
     },

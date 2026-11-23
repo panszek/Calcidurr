@@ -173,7 +173,7 @@ export class LegendTableViewer {
             <div class="btn-group">
               <button type="button" class="tab-btn ${this.currentTab === "all" ? "active" : ""}" data-tab="all">Összes sor</button>
               <button type="button" class="tab-btn ${this.currentTab === "upper" ? "active" : ""}" data-tab="upper">Felső sor (65 db)</button>
-              <button type="button" class="tab-btn ${this.currentTab === "lower" ? "active" : ""}" data-tab="lower">Alsó sor (56 db)</button>
+              <button type="button" class="tab-btn ${this.currentTab === "lower" ? "active" : ""}" data-tab="lower">Alsó sor (54 db)</button>
             </div>
 
             <!-- Zoom Controls -->

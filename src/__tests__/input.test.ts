@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cursorFor,
   dist,
+  hitColumnLowerHalf,
   hitColumnUpperHalf,
   hitDevice,
   hitLegendPoster,
@@ -36,13 +37,44 @@ describe("Canvas input hit-testing & geometry", () => {
 
   it("distinguishes upper factory-wired column half from lower user screw target", () => {
     const world = createTestWorld();
+    const col0 = world.columns[0];
+    const col1 = world.columns[1];
+    const cx0 = col0.x + col0.w / 2; // 700
+    const cx1 = col1.x + col1.w / 2; // 722
+    const cy = col0.y + 92;
+
+    expect(hitColumnUpperHalf(world, { x: cx0, y: col0.y + 20 })?.id).toBe(col0.id);
+    expect(hitColumnUpperHalf(world, { x: cx0, y: cy })).toBeUndefined();
+
+    // Exact screw center hit
+    expect(hitScrewdriverTarget(world, { x: cx0, y: cy })?.id).toBe(col0.portId);
+    expect(hitScrewdriverTarget(world, { x: cx1, y: cy })?.id).toBe(col1.portId);
+
+    // Non-overlapping hitboxes between adjacent columns (Col0 right edge vs Col1 left edge)
+    // col0 at 690..710 (cx0=700), col1 at 712..732 (cx1=722)
+    // Clicking at x=712 (left edge of col1) MUST hit col1, never col0!
+    expect(hitScrewdriverTarget(world, { x: 712, y: cy })?.id).toBe(col1.portId);
+    expect(hitScrewdriverTarget(world, { x: cx0 + 10, y: cy })?.id).toBe(col0.portId);
+
+    // Outside bounds returns undefined
+    expect(hitScrewdriverTarget(world, { x: cx0, y: cy + 25 })).toBeUndefined();
+
+    // Screwdriver does NOT hit Wago (nearestPort fallback removed)
+    const wago = world.wagos[0];
+    expect(hitScrewdriverTarget(world, { x: wago.x + 18, y: wago.y + 46 })).toBeUndefined();
+  });
+
+  it("detects lower column half for wire clicks to prevent unwanted canvas panning", () => {
+    const world = createTestWorld();
     const col = world.columns[0];
     const cx = col.x + col.w / 2;
 
-    expect(hitColumnUpperHalf(world, { x: cx, y: col.y + 20 })?.id).toBe(col.id);
-    expect(hitColumnUpperHalf(world, { x: cx, y: col.y + 92 })).toBeUndefined();
-
-    expect(hitScrewdriverTarget(world, { x: cx, y: col.y + 92 })?.id).toBe(col.portId);
+    // Screw area in lower half
+    expect(hitColumnLowerHalf(world, { x: cx, y: col.y + 92 })?.id).toBe(col.id);
+    // Wire entry area in lower half
+    expect(hitColumnLowerHalf(world, { x: cx, y: col.y + 122 })?.id).toBe(col.id);
+    // Upper half is not lower half
+    expect(hitColumnLowerHalf(world, { x: cx, y: col.y + 20 })).toBeUndefined();
   });
 
   it("detects Wago block body and levers for both closed and open lever heights", () => {

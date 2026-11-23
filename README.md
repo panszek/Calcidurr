@@ -4,8 +4,8 @@ Böngészőben futó, interaktív villanyszerelési gyakorló- és szimulációs
 
 ## Főbb funkciók
 * **Szabadkézi vezetékezés:** Választható szabványos érszínek ($L_1$, $L_2$, $L_3$, $N$, $PE$, vezérlőszál) szabadkézi behúzása a sorkapcsok és Wago összekötők között.
-* **Mechanikai rögzítés szimulációja:** A vezetékek csak akkor vezetnek áramot, ha a sorkapocs csavarja a **Csavarhúzó** eszközzel meg van húzva, vagy a **Wago** karja le van hajtva.
-* **Valós idejű áramköri szimulátor:** Gráf-alapú feszültségkövetés, zárlatvédelem (kismegszakítók leoldása rövidzárlat esetén), mágneskapcsolók (öntartás, reteszelés), időrelé, impulzusrelé és lépcsőházi automata kezelése.
+* **Mechanikai rögzítés szimulációja:** Az üres sorkapcsok alapból kilazított (`tight: false`) állapotból indulnak a gyors bekötéshez. A vezetékek csak akkor vezetnek áramot, ha a sorkapocs csavarja a **Csavarhúzó** eszközzel meg van húzva, vagy a **Wago** karja a **Kéz** eszközzel le van hajtva.
+* **Valós idejű áramköri szimulátor:** Minden védelmi eszköz (kismegszakítók, motorvédő) alapból **KI** állásban indul. Gráf-alapú feszültségkövetés, zárlatvédelem (kismegszakítók leoldása rövidzárlat esetén), mágneskapcsolók (öntartás, reteszelés), időrelé, impulzusrelé és lépcsőházi automata kezelése.
 * **Gyakorló és Hibakereső (Debug) mód:** Normál módban a sorkapcsok funkciója rejtve van (a táblázatból és színjelölésből kell azonosítani), hibakereső módban viszont megjelennek a feszültségszintek és a laza kötések figyelmeztetései.
 
 ---
@@ -39,6 +39,10 @@ Böngészőben futó, interaktív villanyszerelési gyakorló- és szimulációs
 
     npm run dev – Lokális fejlesztői szerver indítása (élő újratöltéssel)
 
-    npm run build – Éles (produkciós) verzió fordítása a dist mappába
+    npm run build – Típusellenőrzés (`tsc --noEmit`) és éles (produkciós) verzió fordítása a `dist` mappába
 
     npm run preview – A lefordított produkciós verzió helyi előnézete
+
+    npm test – Automatizált Vitest unit és szimulációs tesztek futtatása (`vitest run`)
+
+    npm run test:watch – Vitest tesztek futtatása figyelő módban fejlesztés közben
