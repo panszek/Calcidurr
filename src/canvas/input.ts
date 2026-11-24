@@ -13,8 +13,90 @@ import type {
   World,
 } from "../models/types";
 import { hasWagoWires } from "../models/world";
+import { getToolCursor } from "../ui/toolIcons";
 
 export { hitWagoBox, WAGO_BOXES, type WagoBoxDef };
+
+export interface WorkbenchSpoolDef {
+  color: WireColorId;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  name: string;
+  isPrimaryStandard: boolean;
+}
+
+export const WORKBENCH_SPOOL_RACK_BOUNDS = {
+  x: 135,
+  y: 1084,
+  w: 392,
+  h: 154,
+} as const;
+
+export const WORKBENCH_SPOOLS: readonly WorkbenchSpoolDef[] = [
+  { color: "L1", x: 148, y: 1094, w: 54, h: 128, name: "Fekete", isPrimaryStandard: true },
+  { color: "N", x: 210, y: 1094, w: 54, h: 128, name: "Kék", isPrimaryStandard: true },
+  { color: "PE", x: 272, y: 1094, w: 54, h: 128, name: "Zöld-sárga", isPrimaryStandard: true },
+  { color: "L2", x: 340, y: 1094, w: 54, h: 128, name: "Barna", isPrimaryStandard: false },
+  { color: "L3", x: 402, y: 1094, w: 54, h: 128, name: "Szürke", isPrimaryStandard: false },
+  { color: "CTRL", x: 464, y: 1094, w: 54, h: 128, name: "Piros", isPrimaryStandard: false },
+];
+
+export function hitWorkbenchSpool(p: Point): WorkbenchSpoolDef | undefined {
+  return WORKBENCH_SPOOLS.find(
+    (s) => p.x >= s.x && p.x <= s.x + s.w && p.y >= s.y && p.y <= s.y + s.h,
+  );
+}
+
+export interface WorkbenchToolDef {
+  tool: "hand" | "screwdriver" | "cutter";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  title: string;
+}
+
+export const WORKBENCH_TOOL_MAT_BOUNDS = {
+  x: 538,
+  y: 1086,
+  w: 188,
+  h: 146,
+} as const;
+
+export const WORKBENCH_TOOLS: readonly WorkbenchToolDef[] = [
+  {
+    tool: "hand",
+    x: 544,
+    y: 1092,
+    w: 56,
+    h: 134,
+    title: "Kéz / szerelőkesztyű",
+  },
+  {
+    tool: "screwdriver",
+    x: 605,
+    y: 1092,
+    w: 54,
+    h: 134,
+    title: "VDE csavarhúzó",
+  },
+  {
+    tool: "cutter",
+    x: 664,
+    y: 1092,
+    w: 56,
+    h: 134,
+    title: "VDE oldalcsípőfogó",
+  },
+];
+
+export function hitWorkbenchTool(p: Point): WorkbenchToolDef | undefined {
+  return WORKBENCH_TOOLS.find(
+    (t) => p.x >= t.x && p.x <= t.x + t.w && p.y >= t.y && p.y <= t.y + t.h,
+  );
+}
 
 export const WORKBENCH_TESTER_BOUNDS = {
   x: 740,
@@ -38,6 +120,29 @@ export const WORKBENCH_CLAMP_BOUNDS = {
 export function hitWorkbenchClamp(p: Point): boolean {
   const b = WORKBENCH_CLAMP_BOUNDS;
   return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+}
+
+export const WORKBENCH_LEGEND_SHEET_BOUNDS = {
+  x: 1285,
+  y: 1095,
+  w: 150,
+  h: 112,
+} as const;
+
+export function hitWorkbenchLegendSheet(p: Point): boolean {
+  const b = WORKBENCH_LEGEND_SHEET_BOUNDS;
+  return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+}
+
+export function hitAnyWorkbenchInteractive(p: Point): boolean {
+  return Boolean(
+    hitWorkbenchSpool(p) ||
+      hitWorkbenchTool(p) ||
+      hitWorkbenchTester(p) ||
+      hitWorkbenchClamp(p) ||
+      hitWagoBox(p) ||
+      hitWorkbenchLegendSheet(p),
+  );
 }
 
 export function dist(a: Point, b: Point): number {
@@ -266,12 +371,12 @@ export function sampleDraft(points: Point[], next: Point): Point[] {
   return [...points, next];
 }
 
-export function cursorFor(tool: ToolMode, isPanning = false): string {
-  if (isPanning) return "grabbing";
-  if (tool === "wire" || tool === "tester" || tool === "clamp") return "crosshair";
-  if (tool === "screwdriver") return "pointer";
-  if (tool === "cutter") return "not-allowed";
-  return "grab";
+export function cursorFor(
+  tool: ToolMode,
+  isPanning = false,
+  wireColor: WireColorId = "L1",
+): string {
+  return getToolCursor(tool, isPanning, wireColor);
 }
 
 /**

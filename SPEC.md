@@ -2,18 +2,18 @@
 
 Készíts egy böngészőben futó, TypeScript + HTML5 Canvas alapú interaktív villanyszerelési szimulátort, amely egy sorkapocssoros oktatófal bekötését és működését modellezi.
 
-## 1. Alapvető felhasználói élmény és eszközök (Toolbar)
-Legyen egy eszköztár a következő módokkal:
-- **Vezetékezés (Szabadkézi ceruza mód):** Kiválasztható színek: Fekete (`L1`), Barna (`L2`), Szürke (`L3`), Kék (`N`), Zöld-sárga (`PE`), Piros (vezérlőszál).
+## 1. Alapvető felhasználói élmény és eszközök (Hibrid SVG eszköztár + Interaktív munkapad)
+A felhasználói felület hibrid grafikus rendszert használ: felül **szöveg nélküli, részletes SVG ikonsáv** (hover tooltipekkel rázoomolt munkához), alul pedig **közvetlenül kattintható interaktív munkapad** (`y = 1070..1300`), 100%-os szinkronban és aktív módhoz igazodó **egyedi SVG szerszám-kurzorokkal**:
+- **Vezetéktekercsek (Szabadkézi vezetékezés mód):** Kattintható kábeldobok kilógó szigetelt érrel és blankolt réz véggel — Fekete (`L1`), Kék (`N`), Zöld-sárga (`PE`), valamint Barna (`L2`), Szürke (`L3`), Piros (`CTRL` vezérlőszál). Bármely tekercsre kattintva automatikusan vezetékezés módba és a választott színre vált.
   - A felhasználó egy sorkapocs vagy Wago nyílás közelében lenyomja az egeret (15px-es mágneses tapadás a kezdőpontra), szabad kézzel húzza az egeret (rögzítjük a pontokat), majd egy másik kapocspontnál elengedi.
   - A vezeték két vége alapállapotban **LAZA (`isTightened: false`)**, amit egy kis vizuális jelzés (pl. narancssárga körvonal / kilátszó réz ér) mutat a végponton.
-- **Csavarhúzó eszköz:** Sorkapocs csavarjára kattintva meghúzza vagy kilazítja azt (`isTightened` váltása). A csavar feje vizuálisan elfordul 90 fokkal.
-- **Kéz / Ujj eszköz:**
+- **VDE Csavarhúzó eszköz:** Sorkapocs csavarjára kattintva meghúzza vagy kilazítja azt (`isTightened` váltása). A csavar feje vizuálisan elfordul 90 fokkal.
+- **Kéz / Szerelőkesztyű eszköz:**
   - Wago összekötők narancssárga karjának fel- és lehajtása (`isLeverClosed` váltása). A vezeték csak akkor csatlakozik, ha a kar lehajtott állapotban van.
-  - Kapcsolók, nyomógombok és kismegszakítók működtetése (nyomás/billentés).
-- **Csípőfogó eszköz:** Vezeték törlése (csak akkor engedélyezett, ha a vezeték mindkét végén ki van lazítva a csavar / nyitva van a Wago).
-- **UNI-T vizsgáló eszköz (`⚡ UNI-T vizsgáló`):** Kétpólusú feszültség-, fázissorrend- és folytonosságvizsgáló (UNI-T UT18D mintára) fekete (`COM / −`) és piros (`+`) mérőtüskékkel, lebegő digitális/LED műszerpanellel és némítható Web Audio API sípoló hangjelzéssel.
-- **Lakatfogó eszköz (`🧲 Lakatfogó`):** Vezetékre rázáródó digitális váltakozóáramú lakatfogó (UNI-T UT202A+ mintára) valós komplex fázor ágáram-számítással, vezetéken rögzíthető pofával, valamint szabadon mozgatható lebegő LCD műszerpanellel (`~ AC A`, analóg sávkijelző, `DATA HOLD`, lecsatolás).
+  - Kapcsolók, nyomógombok, ÁVK-k és kismegszakítók működtetése (nyomás/billentés).
+- **VDE Oldalcsípőfogó eszköz:** Vezeték törlése (csak akkor engedélyezett, ha a vezeték mindkét végén ki van lazítva a csavar / nyitva van a Wago).
+- **UNI-T vizsgáló eszköz:** Kétpólusú feszültség-, fázissorrend- és folytonosságvizsgáló (UNI-T UT18D mintára) fekete (`COM / −`) és piros (`+`) mérőtüskékkel, lebegő digitális/LED műszerpanellel és némítható Web Audio API sípoló hangjelzéssel.
+- **Lakatfogó eszköz:** Vezetékre rázáródó digitális váltakozóáramú lakatfogó (UNI-T UT202A+ mintára) valós komplex fázor ágáram-számítással, vezetéken rögzíthető pofával, valamint szabadon mozgatható lebegő LCD műszerpanellel (`~ AC A`, analóg sávkijelző, `DATA HOLD`, lecsatolás).
 
 ## 2. Információelrejtés és Hibakereső (Debug) mód
 - **Normál mód (alapértelmezett):** A sorkapcsok fölé víve az egeret **NEM jelenik meg semmilyen súgószöveg**! A felhasználónak csak a sorkapocs számozása és az alatta lévő gyári színkód-négyzetek (fekete, kék, zöld-sárga, piros) segítenek.
@@ -49,11 +49,12 @@ A kód a következő modulokra oszlik (Vite + TypeScript, böngészőben Canvas)
   - `colorCheck.ts` — szabványos kábelszín validáció (Fekete / Kék / Zöld-sárga).
   - `measurements.ts` — UNI-T kétpólusú feszültségmérés (`230V` / `400V` / `0V`), fázissorrend (`R`/`L`), egypólusú fázisjelzés és BFS folytonosságvizsgálat (`0.0 Ω` / `OL`).
   - `currentSolver.ts` — Kirchhoff csomóponti komplex fázor áramhálózat-megoldó (`wireCurrents`) és lakatfogó mérési logika (`DATA HOLD`, túláram-jelzés).
-- `src/ui/` — lebegő műszerfalak és vezérlőpanelek.
+- `src/ui/` — grafikus SVG eszköztár-ikonok, egyedi szerszám-kurzorok és lebegő műszerfalak.
+  - `toolIcons.ts` — szöveg nélküli SVG piktogramok (kéziszerszámok, műszerek, 6-féle kábeldob, segédfunkciók) és színfüggő SVG adat-URI kurzorok.
   - `instrumentPanel.ts` — mozgatható lebegő UNI-T UT18D feszültségvizsgáló panel (Web Audio API sípolóval) és UNI-T UT202A+ digitális lakatfogó panel (`AC A`, bargraph, `HOLD`).
 - `src/canvas/` — megjelenítés és egérkezelés.
-  - `renderer.ts` — sorkapocs, Wago, készülékek, 3F motor, vezeték, UNI-T mérőtüskék/mérőzsinórok, térbeli lakatfogó pofa, debug overlay.
-  - `input.ts` — mágneses tapadás, szabadkézi vonal, eszközök, mérőtüskék és lakatfogó vezeték-vetítés hittestje.
+  - `renderer.ts` — sorkapocs, Wago, készülékek, 3F motor, vezeték, interaktív munkapad (kábeldob-állvány, VDE szerszámalátét és műszer-sziluettek, segédlap), UNI-T mérőtüskék/mérőzsinórok, térbeli lakatfogó pofa, debug overlay.
+  - `input.ts` — mágneses tapadás, szabadkézi vonal, munkapadi tekercsek/szerszámok/műszerek/segédlap, mérőtüskék és lakatfogó vezeték-vetítés hittestje.
   - `legendTable.ts`, `colorCheckPanel.ts` — sorkapocs-kiosztási táblázat és színhiba-panel.
 - `src/data/` — pályaadatok.
   - `colors.ts` — vezeték- és jelölőszínek.
@@ -61,7 +62,7 @@ A kód a következő modulokra oszlik (Vite + TypeScript, böngészőben Canvas)
   - `terminalLegend.ts`, `wagoBoxes.ts` — jegyzékcsoportok és munkapadi WAGO dobozok.
 - `src/__tests__/` — Vitest automatizált unit és szimulációs regressziós tesztek (`npm test`).
   - `testHelpers.ts` — újrahasznosítható bekötő és tápkapcsoló segédfüggvények.
-  - `world.test.ts`, `simulation.test.ts`, `input.test.ts`, `prototypeTrack.test.ts`, `wago.test.ts`, `rcd.test.ts`, `motor.test.ts`, `colorCheck.test.ts`, `measurements.test.ts`, `currentSolver.test.ts` — világmutációk, áramköri szimuláció, ÁVK-k, 3F motor, színellenőrzés, UNI-T mérések, fázor ágáramok és Canvas hit-testek ellenőrzése.
+  - `world.test.ts`, `simulation.test.ts`, `input.test.ts`, `prototypeTrack.test.ts`, `wago.test.ts`, `rcd.test.ts`, `motor.test.ts`, `colorCheck.test.ts`, `measurements.test.ts`, `currentSolver.test.ts`, `workbench.test.ts` — világmutációk, áramköri szimuláció, ÁVK-k, 3F motor, színellenőrzés, UNI-T mérések, fázor ágáramok, grafikus eszköztár/munkapad és Canvas hit-testek ellenőrzése.
 
 ## 6. Vizuális referenciák
 A `sources/` mappa a valós oktatófalat dokumentálja:
@@ -95,7 +96,7 @@ Ezek a szabályok a SPEC 1–4. pontjait egészítik ki a megvalósítás során
     - **Nullavezető (`N`):** kizárólag **Kék (`N`)** vezeték (fekete vagy zöld-sárga tilos).
     - **Védővezető (`PE`):** kizárólag **Zöld-sárga (`PE`)** vezeték (egyéb színek tiltottak).
   - **Statikus és dinamikus ellenőrzés:** kikapcsolt és bekapcsolt kismegszakítóknál egyaránt azonnal lefut; a gráfösszefüggések (BFS) segítségével a WAGO-k áramköri szerepkörét is automatikusan felderíti, valamint jelzi a közvetlen zárlatos keresztkötéseket.
-  - **Interakció:** Az eszköztáron elhelyezett `🎨 Színellenőrzés` gombbal lebegő panel nyitható meg, amely tételesen listázza a hibákat kapcsolati pontokkal és indoklással, a hibás vezetékek körül pedig élénk piros szaggatott aura és figyelmeztető jelvény jelenik meg a Canvas-on.
+  - **Interakció:** A felső ikonsávban elhelyezett grafikus kábelszín-ellenőrzés SVG ikonnal lebegő panel nyitható meg, amely tételesen listázza a hibákat kapcsolati pontokkal és indoklással, a hibás vezetékek körül pedig élénk piros szaggatott aura és figyelmeztető jelvény jelenik meg a Canvas-on.
 
 
 ## 8. Teljes Iskolai Oktatófal Kiosztás és Bővített Rendszer
@@ -210,7 +211,7 @@ A prototípus validációja és a valós fotó (`sources/sorkapocs_kiosztas.png`
 
 ### 8.8. UNI-T UT18D Feszültség- és Folytonosságvizsgáló Műszer:
 - **Két mérőtüskés működés (`ToolMode = "tester"`):**
-  - Aktiválható a felső eszköztár `⚡ UNI-T vizsgáló` gombjával vagy a munkapadon elhelyezett UNI-T műszerre kattintva.
+  - Aktiválható a felső ikonsáv UNI-T vizsgáló SVG ikonjával vagy a munkapadon elhelyezett UNI-T műszerre kattintva.
   - **1. kattintás:** lerakja a **fekete (`COM / −`)** mérőtüskét bármely mérhető pontra (sorkapocs felső gyári vagy alsó csavarja/nyílása, szabad 3/5-ös WAGO nyílás, a motor 6+1 db fix WAGO-ja, valamint a dugaszolóaljzat `L`, `N` és `PE` érintkezői).
   - **Élő mérés és 2. kattintás:** az egér mozgatásával a **piros (`+`)** mérőtüske élőben mér a rögzített fekete ponthoz képest; 2. kattintásra a piros tüske is rögzül, így **Kéz** vagy **Csavarhúzó** eszközre átváltva kapcsolgatás közben is élőben követhető a mérés.
   - **Tüskék elemelése:** jobb egérgomb, `Esc` billentyű, üres helyre kattintás vagy a műszerpanel `⏏ Levétel` gombja.
@@ -231,8 +232,22 @@ A prototípus validációja és a valós fotó (`sources/sorkapocs_kiosztas.png`
     - 3F villanymotor: álló `0.00 A`, Csillag (`Y`) üzem `~1.80 A`, Delta (`Δ`) vonali áram `~5.40 A` (delta tekercság `~3.12 A`), 2-fázisú fázishiba `~8.50 A`.
   - **Fizikai tulajdonságok:** kiegyensúlyozott 3-fázisú terhelés közös nullavezetőjén `0.00 A` (2 aktív fázisnál vektoriálisan `0.43 A`); nyitott áramkörben, laza csavarnál, nyitott WAGO karnál és `PE` védővezetőn `0.00 A`.
 - **Lakatfogó használata (`ToolMode = "clamp"`):**
-  - Aktiválható a felső eszköztár `🧲 Lakatfogó` gombjával vagy az alsó munkapadon lévő lakatfogóra kattintva.
+  - Aktiválható a felső ikonsáv lakatfogó SVG ikonjával vagy az alsó munkapadon lévő lakatfogóra kattintva.
   - Vezeték fölé húzva a nyitott lakatfogó pofa térben rázár a vezetékre és azonnal mutatja az élő áramerősséget; kattintással a pofa rögzül a vezetéken (`📌`), így **Kéz** vagy **Csavarhúzó** eszközre váltva kapcsolgatás közben is élőben figyelhető az áramváltozás.
   - **Információelrejtés védelme:** gyakorló módban a vezetéknél kizárólag a szigetelés színe és a fizikai végpontok (`X1/..`, `X2/..`, WAGO típus) jelennek meg, a rejtett kapocsfunkció nem szivárog ki.
   - **Lebegő UNI-T UT202A+ műszerpanel:** szabadon mozgatható panel (az UNI-T UT18D feszültségvizsgálóval párhuzamosan is nyitva tartható) `~ AC A`, `HOLD` és `MAX!` LED-ekkel, háttérvilágításos LCD kijelzővel, 20 szegmenses analóg sávkijelzővel, `⏸ HOLD` (`H` gyorsbillentyű) érték-kimerevítéssel és `⏏ Lecsatolás` (`Esc` / jobb klikk) vezérlővel.
+
+### 8.10. Hibrid Grafikus Eszköztár, Interaktív Munkapad és Egyedi Szerszám-kurzorok:
+- **Szöveg nélküli felső SVG ikonsáv (`src/ui/toolIcons.ts`, `src/main.ts`, `src/style.css`):**
+  - Hosszú szöveges gombok helyett tiszta, részletes vektoros SVG ikonok (`title`, `aria-label` és azonnali hover tooltip támogatással) rázoomolt munkavégzéshez:
+    - **Kéziszerszámok:** Szerelőkesztyű (`hand`), VDE sárga-piros szigetelt csavarhúzó (`screwdriver`), VDE oldalcsípőfogó (`cutter`).
+    - **Mérőműszerek:** UNI-T UT18D feszültség-/folytonosságvizsgáló (`tester`) és UNI-T UT202A+ lakatfogó (`clamp`), rögzített mérésnél sarok-állapotjelző LED-del.
+    - **Vezetéktekercsek:** 6 db kábeldob ikon kilógó szigetelt érrel és blankolt réz véggel (`L1` Fekete, `N` Kék, `PE` Zöld-sárga szabványos trió + `L2` Barna, `L3` Szürke, `CTRL` Piros) — rákattintva 1 lépésben vezetékezés módba és az adott színre vált.
+    - **Segédfunkciók:** Nagyítás (`+`), Kicsinyítés (`−`), Eredeti méret (`1:1`), Teljes fal nézet, Sorkapocs-kiosztási tábla, Kábelszín-ellenőrzés, Hibakereső (Debug) mód és Pálya törlése.
+- **Teljes interaktív munkapad a Canvas alján (`y = 1070..1300`, `src/canvas/renderer.ts`, `src/canvas/input.ts`):**
+  - **6-dobos fém vezetéktekercs-állvány (`x = 135..527`):** közvetlenül kattintható kábeldobok tengelyen, az aktív tekercs vizuális kiemelésével és magasabbra kihúzott blankolt réz vezetékvégével.
+  - **Gumírozott VDE szerszámalátét (`x = 538..726`):** kattintható szerelőkesztyű, VDE csavarhúzó és VDE oldalcsípőfogó.
+  - **Mérőműszerek, WAGO dobozok és segédlap:** kattintható UNI-T UT18D (`x = 740..828`), UT202A+ lakatfogó (`x = 842..928`), 3-as és 5-ös WAGO alkatrészdobozok (`x = 940..1260`), valamint kattintható laminált sorkapocs-segédlap (`x = 1285..1435`).
+  - **Aktív szerszámok sziluett-visszajelzése:** a kézben lévő kéziszerszám vagy mérőműszer helyén az asztalon halvány szaggatott sziluett látszik, míg a nem használt eszközök fizikai valójukban pihennek a munkapadon. A felső SVG sáv és az alsó munkapad 100%-ban szinkronban működik.
+- **Egyedi SVG szerszám-kurzorok:** aktív módnak megfelelő URL-kódolt SVG kurzor pontos fókuszponttal (VDE csavarhúzó, oldalcsípőfogó, mérőtüske, lakatfogó pofa, valamint a kiválasztott tekercs színével — `PE` esetén zöld-sárga csíkozással — megegyező blankolt réz vezetékvég).
 

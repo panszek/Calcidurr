@@ -269,6 +269,7 @@ A szimulációs, modell-, adat- és hit-test réteg (`src/models/`, `src/engine/
     - 5. szál: `colorCheck.test.ts` (fekete/kék/zöld-sárga kikapcsolt és bekapcsolt állapotban)
     - 6. szál: `measurements.test.ts` (UNI-T 230V/400V/0V, folytonosság kikapcsolt MCB-nél)
     - 7. szál: `currentSolver.test.ts` (párhuzamos áramok, 3F nulla = 0 A, motor Y/Δ áramok)
+    - 8. szál: `workbench.test.ts` (szöveg nélküli SVG ikonok, kábeldobok, szerszám-sziluettek, munkapadi hit-testek, egyedi SVG kurzorok)
 
 ---
 
@@ -386,4 +387,19 @@ flowchart LR
     - Szabad levegőben nyitott pofával követi a kurzort, vezeték fölé érve pedig térben rázár a vezetékre (alsó pofaív a vezeték alatt, felső pofaív és kézi műszerfej a vezeték felett, mindig vízszintes élő Amper címkével).
     - Szabadon mozgatható (draggable), az UNI-T UT18D műszerrel egyidejűleg is nyitva tartható lebegő **UNI-T UT202A+** panel (`~ AC A`, `HOLD`, `MAX!` LED-ek, háttérvilágításos LCD, 20 szegmenses `0..10 A` analóg bargraph, `⏸ HOLD` gomb / `H` gyorsbillentyű és `⏏ Lecsatolás` gomb).
   - **Tesztek:** [`src/__tests__/currentSolver.test.ts`](file:///c:/Users/SIH6SS/Calcidurr/src/__tests__/currentSolver.test.ts) (11 átfogó teszt: nyitott kör / laza csavar / PE / üres dugalj = `0 A`, párhuzamos izzók `0.86 A` / `0.43 A`, 105-ös csillárkapcsoló lépcsőzetes áramösszegzés, mágneskapcsoló + relé + PIR kombinált áramok, szimmetrikus 3F közös nulla = `0.00 A` és aszimmetrikus 2F nulla = `0.43 A`, motor Csillag `1.80 A`, direkt Delta `5.40 A` vonali / `3.12 A` tekercság, mágneskapcsolós Y/Δ átkapcsolás, Csillag és Delta fázishiba `8.50 A`, valamint `measureClampCurrent` és `DATA HOLD`) és a kibővített [`src/__tests__/input.test.ts`](file:///c:/Users/SIH6SS/Calcidurr/src/__tests__/input.test.ts) mind zöld.
-- [ ] **8. szál (Grafikus eszközök, tekercsek, szerszámok):** 6. pont (szöveg nélküli SVG eszköztár + teljes interaktív munkapad + egyedi kurzorok).
+- [x] **8. szál (Grafikus eszközök, tekercsek, szerszámok) — KÉSZ (Szöveg nélküli SVG eszköztár + Teljes interaktív munkapad sziluettekkel + Egyedi SVG szerszám-kurzorok):** A korábbi szöveges gombsor és dekoratív munkapad teljes egészében lecserélve egy 100%-ban szinkronizált hibrid grafikus felületre, automatizált tesztekkel lefedve (`117/117` teszt + `npm run build` sikeres):
+  - **Szöveg nélküli grafikus SVG felső eszköztár (`src/ui/toolIcons.ts`, `src/main.ts`, `src/style.css`):**
+    - Minden gomb tiszta, részletes vektoros SVG piktogrammal jelenik meg (gomb-feliratok nélkül), natív `title`, `aria-label` és azonnali CSS hover tooltippel (`data-tooltip`):
+      - **Kéziszerszámok:** Szerelőkesztyű (`hand`), VDE sárga-piros szigetelt csavarhúzó (`screwdriver`), VDE oldalcsípőfogó (`cutter`).
+      - **Mérőműszerek:** UNI-T UT18D feszültség-/folytonosságvizsgáló (`tester`) és UNI-T UT202A+ lakatfogó (`clamp`), rögzített mérés esetén állapotjelző LED ponttal (`pin-dot`).
+      - **Vezetéktekercsek (`data-spool`):** 6 db egyedi kábeldob SVG kilógó szigetelt érrel és blankolt réz véggel — elöl a 3 szabványos alapszín (**Fekete** `L1`, **Kék** `N`, **Zöld-sárga** `PE`), elválasztó után pedig a kiegészítő tekercsek (**Barna** `L2`, **Szürke** `L3`, **Piros** `CTRL`). Bármelyik tekercsre kattintva 1 lépésben vezetékezés módba és az adott színre vált.
+      - **Segédfunkciók ikonokkal:** Nagyítás, Kicsinyítés, Eredeti `1:1` nézet, Teljes fal nézet, Sorkapocs-kiosztási tábla, Kábelszín-ellenőrzés (állapotjelző LED-del), Hibakereső (Debug) mód, Pálya törlése.
+  - **Teljes interaktív munkapad a Canvas alján (`y = 1070..1300`, `src/canvas/renderer.ts`, `src/canvas/input.ts`, `src/main.ts`):**
+    - **6-dobos fém vezetéktekercs-állvány (`x = 135..527`):** kattintható Fekete, Kék, Zöld-sárga, Barna, Szürke és Piros kábeldobok krómozott tengelyen; az aktív tekercs sárga kerettel kiemelődik és a blankolt rézvégű vezetékszála magasabbra húzódik ki a vezetőgyűrűn.
+    - **Gumírozott VDE szerszámalátét (`x = 538..726`):** közvetlenül kattintható **Szerelőkesztyű**, **VDE csavarhúzó** és **VDE oldalcsípőfogó**.
+    - **Mérőműszerek, WAGO dobozok és segédlap:** kattintható **UNI-T UT18D** (`x = 740..828`), **UT202A+ lakatfogó** (`x = 842..928`), **3-as és 5-ös WAGO dobozok** (`x = 940..1260`), valamint kattintható laminált **sorkapocs-segédlap** (`x = 1285..1435`, megnyitja a jegyzéket).
+    - **Kézben lévő szerszámok és műszerek sziluettje:** az éppen aktív (kézben tartott) kéziszerszám vagy mérőműszer helyén az asztalon halvány szaggatott sziluett jelzi a szerszám helyét, míg a többi eszköz teljes fizikai kidolgozottsággal pihen a munkapadon.
+    - **100%-os kétirányú szinkron:** a felső SVG ikonsáv és az alsó munkapad közös állapotváltókon (`selectTool`, `selectWireSpool`) keresztül működik.
+  - **Egyedi SVG szerszám-kurzorok (`getToolCursor` / `cursorFor`):**
+    - Böngészőbiztos, URL-kódolt `32x32` SVG kurzorok pontos fókuszponttal (hotspot) minden aktív eszközhöz: VDE csavarhúzó pengehegy, csípőfogó vágópofa, mérőtüske hegy, lakatfogó pofa, valamint az éppen kiválasztott tekercs színéhez (beleértve a zöld-sárga `PE` csíkozást is!) igazodó blankolt réz vezetékvég.
+  - **Tesztek:** [`src/__tests__/workbench.test.ts`](file:///c:/Users/SIH6SS/Calcidurr/src/__tests__/workbench.test.ts) (9 átfogó teszt: szövegmentes SVG szerszám-/műszer-/segédikonok, 6 egyedi kábeldob SVG, böngészőbiztos SVG kurzorok és színfüggő vezeték-kurzorok, munkapadi tekercsek/szerszámok/segédlap hit-testjei, teljes munkapadi átfedésmentesség-ellenőrzés, valamint Canvas render és sziluett-alfa validáció) és a kibővített [`src/__tests__/input.test.ts`](file:///c:/Users/SIH6SS/Calcidurr/src/__tests__/input.test.ts) mind zöld.

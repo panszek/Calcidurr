@@ -26,45 +26,149 @@ body,
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  padding: 10px 14px;
-  background: #2a2824;
+  padding: 7px 14px;
+  background: linear-gradient(180deg, #2b2925 0%, #201e1b 100%);
   border-bottom: 1px solid #3e3a33;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  z-index: 90;
 }
 
 #toolbar .group {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   align-items: center;
-  padding-right: 10px;
-  border-right: 1px solid #4a453c;
+  padding-right: 9px;
+  border-right: 1px solid #454037;
 }
 
 #toolbar .group:last-child {
   border-right: 0;
+  padding-right: 0;
 }
 
-#toolbar button,
-#toolbar label.chip {
+#toolbar .spool-sep {
+  width: 1px;
+  height: 24px;
+  background: rgba(148, 163, 184, 0.28);
+  margin: 0 2px;
+}
+
+#toolbar button.icon-btn {
   appearance: none;
-  border: 1px solid #5a5448;
-  background: #3a372f;
-  color: #f3efe6;
-  border-radius: 8px;
-  padding: 7px 10px;
-  font-size: 13px;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #4e493e;
+  background: linear-gradient(180deg, #3a3730 0%, #2f2c26 100%);
+  color: #e2e8f0;
+  border-radius: 9px;
   cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-#toolbar button.active,
-#toolbar label.chip.active {
-  background: #c9a227;
-  color: #1c1b19;
-  border-color: #e4c35a;
-  font-weight: 700;
+#toolbar button.icon-btn.util-btn {
+  width: 36px;
+  height: 36px;
 }
 
-#toolbar input[type="radio"] {
-  display: none;
+#toolbar button.icon-btn:hover {
+  background: linear-gradient(180deg, #47433a 0%, #38352e 100%);
+  border-color: #857c6a;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+#toolbar button.icon-btn:active {
+  transform: translateY(0);
+}
+
+#toolbar button.icon-btn.active {
+  background: linear-gradient(180deg, #3b3219 0%, #2b2412 100%);
+  color: #fde047;
+  border-color: #facc15;
+  box-shadow: 0 0 0 1.5px rgba(250, 204, 21, 0.45), 0 4px 12px rgba(250, 204, 21, 0.2);
+}
+
+#toolbar button.icon-btn.highlight-btn {
+  background: linear-gradient(180deg, #0369a1 0%, #075985 100%);
+  color: #ffffff;
+  border-color: #38bdf8;
+}
+
+#toolbar button.icon-btn.highlight-btn:hover {
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+}
+
+#toolbar button.icon-btn.danger-btn:hover {
+  background: linear-gradient(180deg, #451a1a 0%, #2d1212 100%);
+  border-color: #ef4444;
+  color: #fecaca;
+}
+
+/* Rögzített mérőtüske / lakatfogó / színstátusz visszajelző pont az ikon sarkában */
+#toolbar .pin-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: #38bdf8;
+  border: 1px solid #0f172a;
+  box-shadow: 0 0 6px #38bdf8;
+  pointer-events: none;
+}
+
+#toolbar .pin-dot.ok {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+#toolbar .pin-dot.err {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+/* Azonnali hover tooltip a szöveg nélküli SVG ikonok alatt */
+#toolbar button.icon-btn[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-3px);
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  z-index: 220;
+}
+
+#toolbar button.icon-btn[data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+#toolbar .group:first-child button.icon-btn:first-child[data-tooltip]::after {
+  left: 0;
+  transform: translateX(0) translateY(-3px);
+}
+
+#toolbar .group:first-child button.icon-btn:first-child[data-tooltip]:hover::after {
+  transform: translateX(0) translateY(0);
 }
 
 .swatch {
@@ -86,17 +190,6 @@ body,
   display: block;
   width: 100%;
   height: 100%;
-}
-
-#toolbar button.highlight-btn {
-  background: #0284c7;
-  color: #ffffff;
-  border-color: #38bdf8;
-  font-weight: 700;
-}
-
-#toolbar button.highlight-btn:hover {
-  background: #0369a1;
 }
 
 #toast {

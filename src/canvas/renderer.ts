@@ -1,7 +1,15 @@
 import { MARK_FILL, WIRE_COLORS } from "../data/colors";
 import { UPPER_TERMINAL_GROUPS, LOWER_TERMINAL_GROUPS } from "../data/terminalLegend";
 import { WAGO_BOXES } from "../data/wagoBoxes";
-import { WORKBENCH_CLAMP_BOUNDS, WORKBENCH_TESTER_BOUNDS } from "./input";
+import {
+  WORKBENCH_CLAMP_BOUNDS,
+  WORKBENCH_LEGEND_SHEET_BOUNDS,
+  WORKBENCH_SPOOL_RACK_BOUNDS,
+  WORKBENCH_SPOOLS,
+  WORKBENCH_TESTER_BOUNDS,
+  WORKBENCH_TOOL_MAT_BOUNDS,
+  WORKBENCH_TOOLS,
+} from "./input";
 import { isWireLive } from "../engine/simulation";
 import { hasWagoWires, isWireEndSecure } from "../models/world";
 import type {
@@ -15,17 +23,24 @@ import type {
   TerminalColumn,
   TesterReading,
   ToolMode,
+  WireColorId,
   World,
 } from "../models/types";
 
 export interface RenderExtras {
   debug: boolean;
   tool?: ToolMode;
+  wireColor?: WireColorId;
   hoverPortId?: string;
   hoverWireId?: string;
   hoverWagoId?: string;
   draggedWagoId?: string;
   hoverWagoBoxSlots?: 3 | 5;
+  hoverSpoolColor?: WireColorId;
+  hoverWorkbenchTool?: "hand" | "screwdriver" | "cutter";
+  hoverWorkbenchTester?: boolean;
+  hoverWorkbenchClamp?: boolean;
+  hoverLegendSheet?: boolean;
   draft?: { points: Point[]; color: keyof typeof WIRE_COLORS };
   tooltip?: { x: number; y: number; lines: string[] };
   motorAngle?: number;
@@ -334,7 +349,7 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   ctx.fillText("Bekötési logika: A sorkapcsok felső oldala gyárilag bekötött (fix fali átvezetés). A kapcsolási vezetéket kizárólag az ALSÓ nyílásba kösd be, és az alsó csavart húzd meg csavarhúzóval!", px + 18, py + 175);
   ctx.fillStyle = "#0284c7";
   ctx.font = "700 9.5px Segoe UI";
-  ctx.fillText("Tipp: A felső menüsorban lévő '📋 Sorkapocs tábla' gombra vagy közvetlenül a fenti plakátra kattintva megnyílik a teljes függőleges feliratozású segédtáblázat.", px + 18, py + 192);
+  ctx.fillText("Tipp: A felső ikonsávban lévő táblázat ikonra, a munkapadi rajzlapra vagy közvetlenül erre a plakátra kattintva megnyílik a nagyítható segédtáblázat.", px + 18, py + 192);
 
   // Thumbtacks in 4 corners
   const drawPin = (tx: number, ty: number) => {
@@ -351,96 +366,58 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   drawPin(px + pw - 8, py + ph - 8);
   ctx.restore();
 
-  // 3. Alsó munkapad asztal és szerszámok (Workbench shelf at the bottom)
+  // 3. Alsó munkapad fa asztallap és bal szélső CEE 3F betáp (az interaktív szerszámok és tekercsek külön rétegen)
   ctx.save();
   const by = 1070;
-  // Wooden tabletop
-  ctx.fillStyle = "#ad824a";
+  const woodGrad = ctx.createLinearGradient(0, by, 0, by + 230);
+  woodGrad.addColorStop(0, "#b5894f");
+  woodGrad.addColorStop(0.45, "#a87c43");
+  woodGrad.addColorStop(1, "#936934");
+  ctx.fillStyle = woodGrad;
   ctx.fillRect(0, by, 2200, 230);
-  ctx.fillStyle = "#8a612d";
+
+  // Finom vízszintes faerezet az asztallapon
+  ctx.save();
+  ctx.globalAlpha = 0.14;
+  ctx.strokeStyle = "#5c3d18";
+  ctx.lineWidth = 1.2;
+  for (let gy = by + 22; gy < 1295; gy += 19) {
+    ctx.beginPath();
+    ctx.moveTo(0, gy);
+    ctx.lineTo(2200, gy + ((gy % 38 === 0) ? 2 : -2));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.fillStyle = "#7e5726";
   ctx.fillRect(0, by, 2200, 8);
-  ctx.strokeStyle = "#65451e";
+  ctx.strokeStyle = "#5e401b";
   ctx.lineWidth = 1;
   ctx.strokeRect(0, by, 2200, 230);
 
-  // 3-Phase CEE 16A red plug on the left wall with white cable
-  // White wall junction box
-  roundRect(ctx, 90, by + 30, 80, 80, 6);
+  // 3-Phase CEE 16A red plug on the far-left wall with white supply cable (x = 28..108)
+  roundRect(ctx, 28, by + 26, 78, 76, 6);
   ctx.fillStyle = "#ffffff";
   ctx.fill();
   ctx.strokeStyle = "#9ca3af";
   ctx.stroke();
-  // 5 terminal dots on box
   for (let i = 0; i < 5; i++) {
     ctx.beginPath();
-    ctx.arc(106 + i * 12, by + 70, 3.5, 0, Math.PI * 2);
+    ctx.arc(43 + i * 12, by + 64, 3.3, 0, Math.PI * 2);
     ctx.fillStyle = "#333";
     ctx.fill();
   }
-  // Thick white supply cable
   ctx.beginPath();
-  ctx.moveTo(130, by + 110);
-  ctx.bezierCurveTo(130, by + 150, 110, by + 190, 110, 1300);
-  ctx.lineWidth = 12;
+  ctx.moveTo(67, by + 102);
+  ctx.bezierCurveTo(67, by + 145, 52, by + 185, 52, 1300);
+  ctx.lineWidth = 11;
   ctx.strokeStyle = "#e5e7eb";
   ctx.stroke();
-  // Red CEE plug
-  roundRect(ctx, 92, by + 160, 36, 48, 6);
+  roundRect(ctx, 34, by + 156, 36, 48, 6);
   ctx.fillStyle = "#dc2626";
   ctx.fill();
   ctx.strokeStyle = "#991b1b";
   ctx.stroke();
-
-  // Blueprint diagram on the desk
-  roundRect(ctx, 320, by + 25, 140, 100, 3);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.strokeStyle = "#9ca3af";
-  ctx.stroke();
-  ctx.fillStyle = "#1e3a8a";
-  ctx.font = "700 8.5px Segoe UI";
-  ctx.fillText("KAPCSOLÁSI RAJZ", 330, by + 42);
-  ctx.strokeStyle = "#2563eb";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(330, by + 50, 60, 45);
-  ctx.beginPath();
-  ctx.moveTo(340, by + 72);
-  ctx.lineTo(410, by + 72);
-  ctx.stroke();
-
-  // Screwdriver on the desk
-  ctx.save();
-  ctx.translate(560, by + 50);
-  ctx.rotate(0.3);
-  // Yellow handle
-  roundRect(ctx, -6, -24, 12, 32, 4);
-  ctx.fillStyle = "#eab308";
-  ctx.fill();
-  ctx.strokeStyle = "#ca8a04";
-  ctx.stroke();
-  // Red insulation
-  ctx.fillStyle = "#dc2626";
-  ctx.fillRect(-3, 8, 6, 26);
-  // Metal tip
-  ctx.fillStyle = "#9ca3af";
-  ctx.fillRect(-2, 34, 4, 10);
-  ctx.restore();
-
-  // Pliers on the desk
-  ctx.save();
-  ctx.translate(650, by + 60);
-  ctx.rotate(-0.2);
-  // Red/black handles
-  roundRect(ctx, -14, 0, 10, 38, 4);
-  roundRect(ctx, 4, 0, 10, 38, 4);
-  ctx.fillStyle = "#dc2626";
-  ctx.fill();
-  // Steel jaw
-  ctx.fillStyle = "#6b7280";
-  ctx.fillRect(-10, -22, 20, 22);
-  ctx.restore();
-
-  // UNI-T UT18D műszer helye a munkapadon (részletes rajzolat külön függvényben)
   ctx.restore();
 
   // 4. Motor WAGO kábelköteg a poszter alatt (y = 940) és leállás a motorkapocsházhoz (y = 1122)
@@ -1907,12 +1884,577 @@ function drawLooseHint(ctx: CanvasRenderingContext2D, point: Point) {
   ctx.stroke();
 }
 
+function drawWorkbenchSpools(ctx: CanvasRenderingContext2D, extras: RenderExtras) {
+  const rack = WORKBENCH_SPOOL_RACK_BOUNDS;
+  const activeColor = extras.tool === "wire" ? (extras.wireColor ?? "L1") : undefined;
+
+  ctx.save();
+
+  // Állvány alapárnyék az asztallapon
+  ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+  roundRect(ctx, rack.x + 2, rack.y + rack.h - 14, rack.w - 4, 16, 6);
+  ctx.fill();
+
+  // Fém kábeldob-tartó állvány keret (alsó sín, felső vezetőrúd és 3 tartóláb)
+  ctx.fillStyle = "#1e293b";
+  roundRect(ctx, rack.x, rack.y + rack.h - 18, rack.w, 12, 4);
+  ctx.fill();
+  ctx.strokeStyle = "#475569";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Felső vezetékvezető keresztrúd
+  roundRect(ctx, rack.x + 6, rack.y + 8, rack.w - 12, 7, 3);
+  ctx.fillStyle = "#334155";
+  ctx.fill();
+  ctx.strokeStyle = "#0f172a";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Központi krómozott acéltengely a dobokon át
+  const axleY = rack.y + 80;
+  ctx.fillStyle = "#cbd5e1";
+  ctx.fillRect(rack.x + 4, axleY - 4, rack.w - 8, 8);
+  ctx.fillStyle = "#64748b";
+  ctx.fillRect(rack.x + 4, axleY + 1, rack.w - 8, 3);
+
+  // Bal, középső (szabványos / kiegészítő elválasztó) és jobb tartókonzol
+  for (const postX of [rack.x + 4, 330, rack.x + rack.w - 12]) {
+    roundRect(ctx, postX, rack.y + 6, 8, rack.h - 14, 3);
+    ctx.fillStyle = "#334155";
+    ctx.fill();
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(postX + 4, axleY, 3, 0, Math.PI * 2);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fill();
+  }
+
+  const spoolPalette: Record<
+    WireColorId,
+    { fill: string; highlight: string; groove: string }
+  > = {
+    L1: { fill: "#181a1f", highlight: "#525866", groove: "#090a0d" },
+    N: { fill: "#1d5fb0", highlight: "#60a5fa", groove: "#172554" },
+    PE: { fill: "#16a34a", highlight: "#facc15", groove: "#14532d" },
+    L2: { fill: "#783f19", highlight: "#b46936", groove: "#451a03" },
+    L3: { fill: "#7d8590", highlight: "#cbd5e1", groove: "#334155" },
+    CTRL: { fill: "#dc2626", highlight: "#fca5a5", groove: "#7f1d1d" },
+  };
+
+  for (const spool of WORKBENCH_SPOOLS) {
+    const isActive = activeColor === spool.color;
+    const isHovered = extras.hoverSpoolColor === spool.color;
+    const pal = spoolPalette[spool.color];
+    const cx = spool.x + spool.w / 2;
+
+    ctx.save();
+
+    // Aktív vagy hover kiemelő keret
+    if (isActive || isHovered) {
+      roundRect(ctx, spool.x - 2, spool.y - 4, spool.w + 4, spool.h + 6, 8);
+      ctx.fillStyle = isActive
+        ? "rgba(250, 204, 21, 0.16)"
+        : "rgba(56, 189, 248, 0.14)";
+      ctx.fill();
+      ctx.strokeStyle = isActive ? "#facc15" : "#38bdf8";
+      ctx.lineWidth = isActive ? 2.2 : 1.6;
+      if (!isActive) ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Felső kivezető gyűrű és felfelé kilógó vezetékvég (aktív tekercsnél magasabbra kihúzva!)
+    const guideY = rack.y + 11.5;
+    const tipY = isActive ? spool.y - 21 : spool.y - 9;
+    const tipX = cx + (isActive ? 6 : 3);
+
+    // Szigetelt vezetékszakasz a dobtól a kivezető gyűrűn át
+    ctx.beginPath();
+    ctx.moveTo(cx, spool.y + 34);
+    ctx.quadraticCurveTo(cx - 3, guideY + 6, tipX, tipY + 7);
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = pal.fill;
+    ctx.stroke();
+
+    if (spool.color === "PE") {
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.restore();
+    } else if (spool.color === "L1") {
+      ctx.beginPath();
+      ctx.moveTo(cx - 1, spool.y + 34);
+      ctx.quadraticCurveTo(cx - 4, guideY + 6, tipX - 1, tipY + 7);
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = pal.highlight;
+      ctx.stroke();
+    }
+
+    // Blankolt csillogó réz ér a vezeték csúcsán
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY + 7);
+    ctx.lineTo(tipX + 1.5, tipY);
+    ctx.lineWidth = 2.8;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#fbbf24";
+    ctx.stroke();
+
+    // Porcelán/fém vezetőgyűrű a felső rúdon
+    ctx.beginPath();
+    ctx.arc(cx, guideY, 4.2, 0, Math.PI * 2);
+    ctx.fillStyle = "#0f172a";
+    ctx.fill();
+    ctx.strokeStyle = isActive ? "#facc15" : "#94a3b8";
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // Kábeldob test (bal és jobb peremkorong + feltekercselt vezetékmag)
+    const drumX = spool.x + 8;
+    const drumY = spool.y + 26;
+    const drumW = spool.w - 16;
+    const drumH = 88;
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.36)";
+    ctx.shadowBlur = 7;
+    ctx.shadowOffsetY = 3;
+
+    // Feltekercselt vezetékmag
+    roundRect(ctx, drumX, drumY + 4, drumW, drumH - 8, 4);
+    ctx.fillStyle = pal.fill;
+    ctx.fill();
+    ctx.restore();
+
+    // Tekercsmenetek textúrája
+    const strandCount = 6;
+    const strandW = drumW / strandCount;
+    for (let s = 0; s < strandCount; s++) {
+      const sx = drumX + s * strandW;
+      if (spool.color === "PE") {
+        // Zöld-sárga sávos menetek
+        ctx.fillStyle = "#facc15";
+        ctx.fillRect(sx + 0.5, drumY + 14, strandW - 1, 12);
+        ctx.fillRect(sx + 0.5, drumY + 38, strandW - 1, 12);
+        ctx.fillRect(sx + 0.5, drumY + 62, strandW - 1, 12);
+      }
+      // Menet árnyékbarázda
+      ctx.strokeStyle = pal.groove;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx, drumY + 5);
+      ctx.lineTo(sx, drumY + drumH - 5);
+      ctx.stroke();
+    }
+
+    // Hengeres csillanás a tekercs közepén
+    roundRect(ctx, drumX + 2, drumY + 22, drumW - 4, 9, 3);
+    ctx.fillStyle =
+      spool.color === "PE" ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.18)";
+    ctx.fill();
+    if (spool.color === "L1") {
+      roundRect(ctx, drumX + 2, drumY + 23, drumW - 4, 5, 2);
+      ctx.fillStyle = "rgba(148, 163, 184, 0.28)";
+      ctx.fill();
+    }
+
+    // Bal és jobb oldali műanyag dobperem (flange)
+    for (const fx of [spool.x + 3, spool.x + spool.w - 9]) {
+      roundRect(ctx, fx, drumY, 6, drumH, 2.5);
+      ctx.fillStyle = isActive ? "#475569" : "#27272a";
+      ctx.fill();
+      ctx.strokeStyle = isActive ? "#facc15" : "#09090b";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Alsó színjelző gyűrű / aktív LED pont az állvány talpán (szöveg nélkül!)
+    const dotY = spool.y + spool.h - 2;
+    ctx.beginPath();
+    ctx.arc(cx, dotY, isActive ? 4.5 : 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = isActive ? "#facc15" : pal.fill === "#181a1f" ? "#334155" : pal.fill;
+    ctx.fill();
+    ctx.strokeStyle = isActive ? "#ffffff" : "#0f172a";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function traceGlovePath(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
+  ctx.beginPath();
+  ctx.moveTo(cx - 12, cy + 36);
+  ctx.lineTo(cx - 13, cy + 12);
+  ctx.lineTo(cx - 21, cy + 2);
+  ctx.bezierCurveTo(cx - 24, cy - 2, cx - 22, cy - 8, cx - 17, cy - 9);
+  ctx.bezierCurveTo(cx - 14, cy - 9, cx - 12, cy - 6, cx - 10, cy - 2);
+  ctx.lineTo(cx - 10, cy - 26);
+  ctx.arc(cx - 6.5, cy - 26, 3.5, Math.PI, 0, false);
+  ctx.lineTo(cx - 3, cy - 10);
+  ctx.lineTo(cx - 2.5, cy - 31);
+  ctx.arc(cx + 1.2, cy - 31, 3.7, Math.PI, 0, false);
+  ctx.lineTo(cx + 5, cy - 10);
+  ctx.lineTo(cx + 5.5, cy - 27);
+  ctx.arc(cx + 9, cy - 27, 3.5, Math.PI, 0, false);
+  ctx.lineTo(cx + 12.5, cy - 7);
+  ctx.lineTo(cx + 13.5, cy - 19);
+  ctx.arc(cx + 16.8, cy - 19, 3.2, Math.PI, 0, false);
+  ctx.lineTo(cx + 18.5, cy + 14);
+  ctx.quadraticCurveTo(cx + 18, cy + 28, cx + 13, cy + 36);
+  ctx.closePath();
+}
+
+function drawWorkbenchTools(ctx: CanvasRenderingContext2D, extras: RenderExtras) {
+  const mat = WORKBENCH_TOOL_MAT_BOUNDS;
+
+  ctx.save();
+
+  // Gumírozott VDE szerszám-alátét az asztallapon
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+  ctx.shadowBlur = 9;
+  ctx.shadowOffsetY = 3;
+  roundRect(ctx, mat.x, mat.y, mat.w, mat.h, 9);
+  ctx.fillStyle = "#181d26";
+  ctx.fill();
+  ctx.restore();
+
+  roundRect(ctx, mat.x, mat.y, mat.w, mat.h, 9);
+  ctx.strokeStyle = "#334155";
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  // Elválasztó vonalak a 3 szerszámhely között
+  ctx.strokeStyle = "rgba(71, 85, 105, 0.5)";
+  ctx.lineWidth = 1;
+  for (const divX of [602.5, 661.5]) {
+    ctx.beginPath();
+    ctx.moveTo(divX, mat.y + 8);
+    ctx.lineTo(divX, mat.y + mat.h - 8);
+    ctx.stroke();
+  }
+
+  for (const slot of WORKBENCH_TOOLS) {
+    const inHand = extras.tool === slot.tool;
+    const isHovered = extras.hoverWorkbenchTool === slot.tool;
+    const cx = slot.x + slot.w / 2;
+    const cy = slot.y + slot.h / 2 + 2;
+
+    ctx.save();
+
+    // Fészek / hover keret
+    if (inHand || isHovered) {
+      roundRect(ctx, slot.x + 1, slot.y + 1, slot.w - 2, slot.h - 2, 7);
+      ctx.fillStyle = inHand
+        ? "rgba(250, 204, 21, 0.07)"
+        : "rgba(56, 189, 248, 0.12)";
+      ctx.fill();
+      ctx.strokeStyle = inHand ? "rgba(250, 204, 21, 0.65)" : "#38bdf8";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash(inHand ? [4, 3] : []);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (slot.tool === "hand") {
+      // 1. Halvány sziluett az alátéten (ha kézben van a szerszám, csak ez látszik!)
+      ctx.save();
+      traceGlovePath(ctx, cx, cy - 2);
+      ctx.fillStyle = "rgba(148, 163, 184, 0.14)";
+      ctx.fill();
+      ctx.setLineDash([3, 2.5]);
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.5)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
+
+      if (!inHand) {
+        // Fizikai szerelőkesztyű az asztalon
+        ctx.save();
+        ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetY = 3;
+        traceGlovePath(ctx, cx, cy - 2);
+        ctx.fillStyle = "#e2e8f0";
+        ctx.fill();
+        ctx.restore();
+
+        traceGlovePath(ctx, cx, cy - 2);
+        ctx.strokeStyle = "#0f172a";
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+
+        // Narancs nitril csúszásgátló tenyérbetét
+        roundRect(ctx, cx - 9, cy - 6, 22, 26, 6);
+        ctx.fillStyle = "#ea580c";
+        ctx.fill();
+
+        // Gumírozott csuklópánt
+        roundRect(ctx, cx - 12.5, cy + 28, 26, 12, 3);
+        ctx.fillStyle = "#334155";
+        ctx.fill();
+        ctx.strokeStyle = "#0f172a";
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+      }
+    } else if (slot.tool === "screwdriver") {
+      // 2. VDE Csavarhúzó sziluett + fizikai szerszám
+      ctx.save();
+      roundRect(ctx, cx - 9, cy - 52, 18, 46, 6);
+      ctx.fillStyle = "rgba(148, 163, 184, 0.14)";
+      ctx.fill();
+      ctx.setLineDash([3, 2.5]);
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.5)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.rect(cx - 3, cy - 6, 6, 52);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      if (!inHand) {
+        ctx.save();
+        ctx.shadowColor = "rgba(0, 0, 0, 0.48)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetY = 3;
+        // Sárga-piros VDE markolat
+        roundRect(ctx, cx - 8.5, cy - 52, 17, 44, 6);
+        ctx.fillStyle = "#eab308";
+        ctx.fill();
+        ctx.restore();
+
+        roundRect(ctx, cx - 8.5, cy - 52, 17, 44, 6);
+        ctx.strokeStyle = "#854d0e";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        // Piros betét a markolaton + ujjvédő perem
+        roundRect(ctx, cx - 5.5, cy - 42, 11, 24, 3.5);
+        ctx.fillStyle = "#dc2626";
+        ctx.fill();
+        roundRect(ctx, cx - 11, cy - 11, 22, 5, 2);
+        ctx.fillStyle = "#dc2626";
+        ctx.fill();
+
+        // Piros VDE szigetelt szár
+        roundRect(ctx, cx - 3, cy - 6, 6, 38, 1.5);
+        ctx.fillStyle = "#dc2626";
+        ctx.fill();
+        ctx.strokeStyle = "#7f1d1d";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Edzett acél lapos pengehegy
+        ctx.beginPath();
+        ctx.moveTo(cx - 2.6, cy + 32);
+        ctx.lineTo(cx + 2.6, cy + 32);
+        ctx.lineTo(cx + 1.8, cy + 46);
+        ctx.lineTo(cx - 1.8, cy + 46);
+        ctx.closePath();
+        ctx.fillStyle = "#cbd5e1";
+        ctx.fill();
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 0.9;
+        ctx.stroke();
+      }
+    } else if (slot.tool === "cutter") {
+      // 3. VDE Oldalcsípőfogó sziluett + fizikai szerszám
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 50);
+      ctx.lineTo(cx - 13, cy - 22);
+      ctx.lineTo(cx - 18, cy + 44);
+      ctx.lineTo(cx - 7, cy + 46);
+      ctx.lineTo(cx, cy - 6);
+      ctx.lineTo(cx + 7, cy + 46);
+      ctx.lineTo(cx + 18, cy + 44);
+      ctx.lineTo(cx + 13, cy - 22);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(148, 163, 184, 0.14)";
+      ctx.fill();
+      ctx.setLineDash([3, 2.5]);
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.5)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
+
+      if (!inHand) {
+        // Acél vágópofák fent
+        ctx.save();
+        ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetY = 3;
+
+        ctx.beginPath();
+        ctx.moveTo(cx - 1, cy - 48);
+        ctx.quadraticCurveTo(cx - 12, cy - 38, cx - 10, cy - 18);
+        ctx.lineTo(cx - 0.5, cy - 18);
+        ctx.closePath();
+        ctx.fillStyle = "#cbd5e1";
+        ctx.fill();
+        ctx.strokeStyle = "#1e293b";
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(cx + 1, cy - 48);
+        ctx.quadraticCurveTo(cx + 12, cy - 38, cx + 10, cy - 18);
+        ctx.lineTo(cx + 0.5, cy - 18);
+        ctx.closePath();
+        ctx.fillStyle = "#94a3b8";
+        ctx.fill();
+        ctx.strokeStyle = "#1e293b";
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+
+        // Bal és jobb ívelt VDE szigetelt markolatszár (piros-sárga)
+        for (const dir of [-1, 1] as const) {
+          ctx.beginPath();
+          ctx.moveTo(cx + dir * 3, cy - 16);
+          ctx.quadraticCurveTo(cx + dir * 16, cy + 8, cx + dir * 17, cy + 44);
+          ctx.lineTo(cx + dir * 8, cy + 45);
+          ctx.quadraticCurveTo(cx + dir * 7, cy + 12, cx + dir * 1, cy - 8);
+          ctx.closePath();
+          ctx.fillStyle = "#dc2626";
+          ctx.fill();
+          ctx.strokeStyle = "#7f1d1d";
+          ctx.lineWidth = 1.1;
+          ctx.stroke();
+
+          // Sárga VDE csúszásgátló betét a szárakon
+          ctx.beginPath();
+          ctx.moveTo(cx + dir * 7, cy - 4);
+          ctx.lineTo(cx + dir * 13, cy + 16);
+          ctx.lineTo(cx + dir * 9, cy + 18);
+          ctx.lineTo(cx + dir * 4, cy - 2);
+          ctx.closePath();
+          ctx.fillStyle = "#facc15";
+          ctx.fill();
+        }
+        ctx.restore();
+
+        // Csuklószegecs
+        ctx.beginPath();
+        ctx.arc(cx, cy - 18, 4.8, 0, Math.PI * 2);
+        ctx.fillStyle = "#475569";
+        ctx.fill();
+        ctx.strokeStyle = "#0f172a";
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawWorkbenchLegendSheet(ctx: CanvasRenderingContext2D, extras: RenderExtras) {
+  const b = WORKBENCH_LEGEND_SHEET_BOUNDS;
+  const hovered = !!extras.hoverLegendSheet;
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.32)";
+  ctx.shadowBlur = hovered ? 10 : 6;
+  ctx.shadowOffsetY = 3;
+
+  roundRect(ctx, b.x, b.y, b.w, b.h, 5);
+  ctx.fillStyle = hovered ? "#ffffff" : "#f8fafc";
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = hovered ? "#0284c7" : "#64748b";
+  ctx.lineWidth = hovered ? 2.2 : 1.2;
+  ctx.stroke();
+
+  // Fejléc sáv
+  roundRect(ctx, b.x + 3, b.y + 3, b.w - 6, 18, 3);
+  ctx.fillStyle = hovered ? "#0284c7" : "#1e293b";
+  ctx.fill();
+
+  // Miniatűr sorkapocs-színcsík mátrix (X1 és X2 vizuális előnézet szöveghalom nélkül)
+  const miniColors = [
+    "#2563eb",
+    "#eab308",
+    "#eab308",
+    "#eab308",
+    "#16a34a",
+    "#dc2626",
+    "#78350f",
+    "#18181b",
+    "#2563eb",
+    "#dc2626",
+  ];
+  for (const rowY of [b.y + 30, b.y + 64]) {
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(b.x + 10, rowY, b.w - 20, 24);
+    const cellW = (b.w - 20) / miniColors.length;
+    miniColors.forEach((col, idx) => {
+      const cx = b.x + 10 + idx * cellW;
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.strokeRect(cx, rowY, cellW, 24);
+      ctx.fillStyle = col;
+      ctx.fillRect(cx + 2, rowY + 14, cellW - 4, 7);
+    });
+  }
+
+  // Nagyító piktogram a jobb alsó sarokban
+  const mx = b.x + b.w - 22;
+  const my = b.y + b.h - 14;
+  ctx.beginPath();
+  ctx.arc(mx, my, 6, 0, Math.PI * 2);
+  ctx.fillStyle = "#e0f2fe";
+  ctx.fill();
+  ctx.strokeStyle = "#0284c7";
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(mx + 4.2, my + 4.2);
+  ctx.lineTo(mx + 9, my + 9);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 function drawWorkbenchTester(ctx: CanvasRenderingContext2D, extras: RenderExtras) {
   const b = WORKBENCH_TESTER_BOUNDS;
   const reading = extras.testerReading;
   const isTesterActive = extras.tool === "tester";
+  const hasProbesOnBoard = !!(extras.blackProbe || extras.redProbe);
+  const isHovered = !!extras.hoverWorkbenchTester;
 
   ctx.save();
+
+  // Halvány sziluett-hely az asztallapon (amikor a műszer kézben van, ez jelzi a helyét!)
+  ctx.save();
+  roundRect(ctx, b.x, b.y, b.w, b.h, 11);
+  ctx.fillStyle = "rgba(15, 23, 42, 0.24)";
+  ctx.fill();
+  ctx.setLineDash([5, 3]);
+  ctx.strokeStyle = isTesterActive
+    ? "rgba(56, 189, 248, 0.75)"
+    : isHovered
+      ? "#38bdf8"
+      : "rgba(226, 232, 240, 0.42)";
+  ctx.lineWidth = isTesterActive || isHovered ? 2 : 1.3;
+  ctx.stroke();
+  ctx.restore();
+
+  // Kézben tartott műszer esetén halvány sziluett (ha mérőzsinór van bedugva, félig áttetsző marad a zsinórtőhöz)
+  if (isTesterActive) {
+    ctx.globalAlpha = hasProbesOnBoard ? 0.45 : 0.24;
+  }
 
   // Árnyék az asztallapon
   ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
@@ -1925,19 +2467,9 @@ function drawWorkbenchTester(ctx: CanvasRenderingContext2D, extras: RenderExtras
   ctx.fill();
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
-  ctx.strokeStyle = isTesterActive ? "#38bdf8" : "#991b1b";
-  ctx.lineWidth = isTesterActive ? 2.5 : 1.5;
+  ctx.strokeStyle = isTesterActive || isHovered ? "#38bdf8" : "#991b1b";
+  ctx.lineWidth = isTesterActive || isHovered ? 2.4 : 1.5;
   ctx.stroke();
-
-  if (isTesterActive) {
-    ctx.save();
-    roundRect(ctx, b.x - 4, b.y - 4, b.w + 8, b.h + 8, 14);
-    ctx.strokeStyle = "rgba(56, 189, 248, 0.7)";
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([5, 3]);
-    ctx.stroke();
-    ctx.restore();
-  }
 
   // Belső antracit előlap
   roundRect(ctx, b.x + 6, b.y + 8, b.w - 12, b.h - 20, 7);
@@ -2021,24 +2553,36 @@ function drawWorkbenchClampMeter(ctx: CanvasRenderingContext2D, extras: RenderEx
   const reading = extras.clampReading;
   const isClampTool = extras.tool === "clamp";
   const isClampedOnBoard = !!extras.clampedTarget;
+  const isHovered = !!extras.hoverWorkbenchClamp;
+  const cx = b.x + b.w / 2;
 
   ctx.save();
-  if (isClampedOnBoard && !isClampTool) {
-    ctx.globalAlpha = 0.62;
-  }
 
-  // Aktív kijelölési keret lakatfogó módban
-  if (isClampTool) {
-    ctx.save();
-    roundRect(ctx, b.x - 4, b.y - 4, b.w + 8, b.h + 8, 14);
-    ctx.strokeStyle = "rgba(251, 191, 36, 0.85)";
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([5, 3]);
-    ctx.stroke();
-    ctx.restore();
-  }
+  // Halvány sziluett-hely az asztallapon (pofa + műszerház körvonal)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, b.y + 24, 21, Math.PI * 0.85, Math.PI * 0.15, false);
+  ctx.fillStyle = "rgba(15, 23, 42, 0.22)";
+  ctx.fill();
+  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = isClampTool
+    ? "rgba(251, 191, 36, 0.85)"
+    : isHovered
+      ? "#38bdf8"
+      : "rgba(226, 232, 240, 0.42)";
+  ctx.lineWidth = isClampTool || isHovered ? 2 : 1.3;
+  ctx.stroke();
 
-  const cx = b.x + b.w / 2;
+  roundRect(ctx, b.x + 9, b.y + 42, b.w - 14, b.h - 42, 11);
+  ctx.fillStyle = "rgba(15, 23, 42, 0.24)";
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // Ha a lakatfogó a kezünkben van vagy vezetéken lóg a falon, csak halvány sziluett látszik az asztalon
+  if (isClampTool || isClampedOnBoard) {
+    ctx.globalAlpha = 0.24;
+  }
 
   // 1. Felső lakatfogó transzformátorpofa (teardrop pincer jaws)
   ctx.save();
@@ -2604,10 +3148,13 @@ export function renderWorld(
     }
   }
 
-  // Draw WAGO dispenser boxes, UNI-T tester and Clamp Meter on the workbench
+  // Draw interactive workbench stations: wire spools, VDE hand tools, UNI-T tester, Clamp Meter, WAGO boxes & diagram sheet
+  drawWorkbenchSpools(ctx, extras);
+  drawWorkbenchTools(ctx, extras);
   drawWagoBoxes(ctx, world, extras);
   drawWorkbenchTester(ctx, extras);
   drawWorkbenchClampMeter(ctx, extras);
+  drawWorkbenchLegendSheet(ctx, extras);
 
   for (const wago of world.wagos) {
     drawWago(ctx, world, wago, extras.hoverPortId, extras.hoverWagoId, extras.draggedWagoId);

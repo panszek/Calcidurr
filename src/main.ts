@@ -2,6 +2,7 @@ import "./style.css";
 import { renderWorld } from "./canvas/renderer";
 import {
   cursorFor,
+  hitAnyWorkbenchInteractive,
   hitClampTarget,
   hitColumnLowerHalf,
   hitColumnUpperHalf,
@@ -16,7 +17,10 @@ import {
   hitWagoRotateButton,
   hitWire,
   hitWorkbenchClamp,
+  hitWorkbenchLegendSheet,
+  hitWorkbenchSpool,
   hitWorkbenchTester,
+  hitWorkbenchTool,
   nearestPort,
   sampleDraft,
   syncClampTarget,
@@ -25,7 +29,6 @@ import {
 } from "./canvas/input";
 import { LegendTableViewer } from "./canvas/legendTable";
 import { ColorCheckPanel } from "./canvas/colorCheckPanel";
-import { WIRE_COLORS } from "./data/colors";
 import { createPrototypeWorld } from "./data/prototypeTrack";
 import { checkWireColors } from "./engine/colorCheck";
 import { measureClampCurrent } from "./engine/currentSolver";
@@ -44,6 +47,12 @@ import type {
   World,
 } from "./models/types";
 import { ClampMeterPanel, InstrumentPanel } from "./ui/instrumentPanel";
+import {
+  getToolbarSpools,
+  TOOLBAR_HAND_TOOLS,
+  TOOLBAR_INSTRUMENTS,
+  UTILITY_ICONS,
+} from "./ui/toolIcons";
 import {
   addWire,
   hasWagoWires,
@@ -90,6 +99,11 @@ let draggedWago:
     }
   | undefined;
 let hoveredWagoBoxSlots: 3 | 5 | undefined;
+let hoverSpoolColor: WireColorId | undefined;
+let hoverWorkbenchTool: ("hand" | "screwdriver" | "cutter") | undefined;
+let hoverWorkbenchTester = false;
+let hoverWorkbenchClamp = false;
+let hoverLegendSheet = false;
 let pendingLeverPort: Port | undefined;
 let pressedButtonId: string | undefined;
 let toastTimer = 0;
@@ -133,6 +147,7 @@ function clearProbes() {
 const instrumentPanel = new InstrumentPanel({
   onClearProbes: () => {
     clearProbes();
+    paintToolbar();
     draw();
   },
   onClose: () => {
@@ -140,9 +155,10 @@ const instrumentPanel = new InstrumentPanel({
     redProbe = undefined;
     if (tool === "tester") {
       tool = "hand";
-      paintToolbar();
     }
     updateTester();
+    paintToolbar();
+    canvas.style.cursor = cursorFor(tool, isPanning, wireColor);
     draw();
   },
 });
@@ -186,10 +202,12 @@ function toggleClampHold() {
 const clampPanel = new ClampMeterPanel({
   onToggleHold: () => {
     toggleClampHold();
+    paintToolbar();
     draw();
   },
   onDetachClamp: () => {
     clearClamp();
+    paintToolbar();
     draw();
   },
   onClose: () => {
@@ -198,9 +216,10 @@ const clampPanel = new ClampMeterPanel({
     clampHoldValue = null;
     if (tool === "clamp") {
       tool = "hand";
-      paintToolbar();
     }
     updateClamp();
+    paintToolbar();
+    canvas.style.cursor = cursorFor(tool, isPanning, wireColor);
     draw();
   },
 });
@@ -294,50 +313,93 @@ function resetZoom() {
   draw();
 }
 
-function paintToolbar() {
-  const tools: { id: ToolMode; label: string }[] = [
-    { id: "wire", label: "Vezetékezés" },
-    { id: "screwdriver", label: "Csavarhúzó" },
-    { id: "hand", label: "Kéz / ujj" },
-    { id: "cutter", label: "Csípőfogó" },
-    { id: "tester", label: "⚡ UNI-T vizsgáló" },
-    { id: "clamp", label: "🧲 Lakatfogó" },
-  ];
+function selectTool(nextTool: ToolMode) {
+  tool = nextTool;
+  if (tool === "tester") {
+    instrumentPanel.show();
+  } else if (!blackProbe && !redProbe) {
+    instrumentPanel.hide();
+  }
+  if (tool === "clamp") {
+    clampPanel.show();
+  } else if (!clampedTarget && clampHoldValue === null) {
+    clampPanel.hide();
+  }
+  updateTester();
+  updateClamp();
+  paintToolbar();
+  canvas.style.cursor = cursorFor(tool, isPanning, wireColor);
+  draw();
+}
 
-  const colorButtons = (Object.keys(WIRE_COLORS) as WireColorId[])
-    .map((id) => {
-      const c = WIRE_COLORS[id];
-      const active = wireColor === id && tool === "wire" ? "active" : "";
-      return `<label class="chip ${active}">
-        <input type="radio" name="color" value="${id}" ${wireColor === id ? "checked" : ""} />
-        <span class="swatch" style="background:${c.stroke}"></span>${c.name}
-      </label>`;
+function selectWireSpool(color: WireColorId) {
+  wireColor = color;
+  selectTool("wire");
+}
+
+function paintToolbar() {
+  const handButtons = TOOLBAR_HAND_TOOLS.map((t) => {
+    const active = tool === t.id ? "active" : "";
+    return `<button type="button" class="icon-btn ${active}" data-tool="${t.id}" title="${t.title}" aria-label="${t.title}" data-tooltip="${t.shortTip}">${t.svg}</button>`;
+  }).join("");
+
+  const instrumentButtons = TOOLBAR_INSTRUMENTS.map((t) => {
+    const active = tool === t.id ? "active" : "";
+    const pinnedIndicator =
+      (t.id === "tester" && (blackProbe || redProbe)) ||
+      (t.id === "clamp" && (clampedTarget || clampHoldValue !== null));
+    const badge = pinnedIndicator ? `<span class="pin-dot" aria-hidden="true"></span>` : "";
+    return `<button type="button" class="icon-btn ${active}" data-tool="${t.id}" title="${t.title}" aria-label="${t.title}" data-tooltip="${t.shortTip}">${t.svg}${badge}</button>`;
+  }).join("");
+
+  const spools = getToolbarSpools();
+  const primarySpools = spools
+    .filter((s) => s.isPrimaryStandard)
+    .map((s) => {
+      const active = tool === "wire" && wireColor === s.color ? "active" : "";
+      return `<button type="button" class="icon-btn spool-btn ${active}" data-spool="${s.color}" title="${s.title}" aria-label="${s.title}" data-tooltip="${s.shortTip}">${s.svg}</button>`;
     })
     .join("");
 
+  const auxSpools = spools
+    .filter((s) => !s.isPrimaryStandard)
+    .map((s) => {
+      const active = tool === "wire" && wireColor === s.color ? "active" : "";
+      return `<button type="button" class="icon-btn spool-btn ${active}" data-spool="${s.color}" title="${s.title}" aria-label="${s.title}" data-tooltip="${s.shortTip}">${s.svg}</button>`;
+    })
+    .join("");
+
+  const u = UTILITY_ICONS;
+  const hasColorIssues = colorCheckResult.issues.length > 0;
+  const colorBadge = colorCheckActive
+    ? `<span class="pin-dot ${hasColorIssues ? "err" : "ok"}" aria-hidden="true"></span>`
+    : "";
+
   toolbar.innerHTML = `
-    <div class="group">
-      ${tools
-        .map(
-          (t) =>
-            `<button type="button" data-tool="${t.id}" class="${tool === t.id ? "active" : ""}">${t.label}</button>`,
-        )
-        .join("")}
+    <div class="group" data-group="tools">
+      ${handButtons}
     </div>
-    <div class="group" data-colors>${colorButtons}</div>
-    <div class="group">
-      <button type="button" data-zoom-in title="Nagyítás">+</button>
-      <button type="button" data-zoom-out title="Kicsinyítés">−</button>
-      <button type="button" data-zoom-reset title="100% nézet">1:1</button>
-      <button type="button" data-fit title="Teljes fal nézet">Teljes fal</button>
+    <div class="group" data-group="instruments">
+      ${instrumentButtons}
     </div>
-    <div class="group">
-      <button type="button" data-legend class="highlight-btn" title="Sorkapocs-kiosztási magyarázó tábla megnyitása">📋 Sorkapocs tábla</button>
-      <button type="button" data-color-check class="${colorCheckActive ? "active" : ""}" title="Szabványos kábelszínek ellenőrzése">🎨 Színellenőrzés</button>
+    <div class="group" data-group="spools">
+      ${primarySpools}
+      <span class="spool-sep" aria-hidden="true"></span>
+      ${auxSpools}
     </div>
-    <div class="group">
-      <button type="button" data-debug class="${debug ? "active" : ""}">Hibakereső mód</button>
-      <button type="button" data-reset>Pálya törlése</button>
+    <div class="group" data-group="view">
+      <button type="button" class="icon-btn util-btn" data-zoom-in title="${u.zoomIn.title}" aria-label="${u.zoomIn.title}" data-tooltip="${u.zoomIn.shortTip}">${u.zoomIn.svg}</button>
+      <button type="button" class="icon-btn util-btn" data-zoom-out title="${u.zoomOut.title}" aria-label="${u.zoomOut.title}" data-tooltip="${u.zoomOut.shortTip}">${u.zoomOut.svg}</button>
+      <button type="button" class="icon-btn util-btn" data-zoom-reset title="${u.zoomReset.title}" aria-label="${u.zoomReset.title}" data-tooltip="${u.zoomReset.shortTip}">${u.zoomReset.svg}</button>
+      <button type="button" class="icon-btn util-btn" data-fit title="${u.fitView.title}" aria-label="${u.fitView.title}" data-tooltip="${u.fitView.shortTip}">${u.fitView.svg}</button>
+    </div>
+    <div class="group" data-group="inspect">
+      <button type="button" class="icon-btn highlight-btn" data-legend title="${u.legend.title}" aria-label="${u.legend.title}" data-tooltip="${u.legend.shortTip}">${u.legend.svg}</button>
+      <button type="button" class="icon-btn ${colorCheckActive ? "active" : ""}" data-color-check title="${u.colorCheck.title}" aria-label="${u.colorCheck.title}" data-tooltip="${u.colorCheck.shortTip}">${u.colorCheck.svg}${colorBadge}</button>
+    </div>
+    <div class="group" data-group="system">
+      <button type="button" class="icon-btn ${debug ? "active" : ""}" data-debug title="${u.debug.title}" aria-label="${u.debug.title}" data-tooltip="${u.debug.shortTip}">${u.debug.svg}</button>
+      <button type="button" class="icon-btn danger-btn" data-reset title="${u.reset.title}" aria-label="${u.reset.title}" data-tooltip="${u.reset.shortTip}">${u.reset.svg}</button>
     </div>
   `;
 }
@@ -385,11 +447,17 @@ function draw() {
   renderWorld(ctx, world, sim, {
     debug,
     tool,
+    wireColor,
     hoverPortId,
     hoverWireId,
     hoverWagoId: hoveredWagoId,
     draggedWagoId: draggedWago?.id,
     hoverWagoBoxSlots: hoveredWagoBoxSlots,
+    hoverSpoolColor,
+    hoverWorkbenchTool,
+    hoverWorkbenchTester,
+    hoverWorkbenchClamp,
+    hoverLegendSheet,
     draft: draft ? { points: draft.points, color: draft.color } : undefined,
     tooltip: hoverPortId ? tooltipForPort(hoverPortId) : undefined,
     motorAngle,
@@ -482,36 +550,69 @@ canvas.addEventListener("pointerdown", (event) => {
   const p = eventPoint(event);
   pointerWorldPos = p;
 
-  // Magyarázó plakátra való kattintás az oktatófalon
-  if (hitLegendPoster(p)) {
+  // Magyarázó plakátra vagy munkapadi segédlapra való kattintás
+  if (hitLegendPoster(p) || hitWorkbenchLegendSheet(p)) {
     legendViewer.open();
+    return;
+  }
+
+  // Munkapadon lévő vezetéktekercsre kattintás: azonnal vezetékezés módba és az adott színre vált
+  const clickedSpool = hitWorkbenchSpool(p);
+  if (clickedSpool) {
+    selectWireSpool(clickedSpool.color);
+    return;
+  }
+
+  // Munkapadon lévő kéziszerszámra (kesztyű / csavarhúzó / csípőfogó) kattintás
+  const clickedWbTool = hitWorkbenchTool(p);
+  if (clickedWbTool) {
+    selectTool(clickedWbTool.tool);
     return;
   }
 
   // Munkapadon lévő UNI-T műszerre kattintás aktiválja a vizsgáló módot
   if (hitWorkbenchTester(p)) {
-    tool = "tester";
-    instrumentPanel.show();
-    if (!clampedTarget && clampHoldValue === null) {
-      clampPanel.hide();
-    }
-    updateTester();
-    updateClamp();
-    paintToolbar();
-    draw();
+    selectTool("tester");
     return;
   }
 
   // Munkapadon lévő Lakatfogóra kattintás aktiválja a lakatfogó módot
   if (hitWorkbenchClamp(p)) {
-    tool = "clamp";
-    clampPanel.show();
-    if (!blackProbe && !redProbe) {
-      instrumentPanel.hide();
+    selectTool("clamp");
+    return;
+  }
+
+  // WAGO dobozra kattintás (új 3-as vagy 5-ös WAGO kihúzása a munkapadról)
+  const clickedBox = hitWagoBox(p);
+  if (clickedBox) {
+    if (tool === "screwdriver") {
+      showToast("A WAGO dobozhoz válaszd a Kéz eszközt!");
+      return;
     }
-    updateClamp();
-    updateTester();
-    paintToolbar();
+    if (tool === "cutter") {
+      return;
+    }
+    if (tool === "tester" || tool === "clamp") {
+      tool = "hand";
+      if (!blackProbe && !redProbe) instrumentPanel.hide();
+      if (!clampedTarget && clampHoldValue === null) clampPanel.hide();
+      updateTester();
+      updateClamp();
+      paintToolbar();
+    }
+    const w = 18 + clickedBox.slots * 24;
+    const h = 66;
+    const newWago = spawnWago(world, clickedBox.slots, p.x - w / 2, p.y - h / 2);
+    draggedWago = {
+      id: newWago.id,
+      startX: p.x,
+      startY: p.y,
+      ox: w / 2,
+      oy: h / 2,
+      moved: false,
+      isNewSpawn: true,
+      boxSlots: clickedBox.slots,
+    };
     draw();
     return;
   }
@@ -524,6 +625,7 @@ canvas.addEventListener("pointerdown", (event) => {
       hoverClampTarget = target;
       clampHoldValue = null;
       updateClamp();
+      paintToolbar();
       draw();
       return;
     }
@@ -557,6 +659,7 @@ canvas.addEventListener("pointerdown", (event) => {
       }
       hoverProbeTarget = target;
       updateTester();
+      paintToolbar();
       draw();
       return;
     }
@@ -572,33 +675,6 @@ canvas.addEventListener("pointerdown", (event) => {
       oy: view.oy,
     };
     canvas.style.cursor = "grabbing";
-    return;
-  }
-
-  // WAGO dobozra kattintás (új 3-as vagy 5-ös WAGO kihúzása a munkapadról)
-  const clickedBox = hitWagoBox(p);
-  if (clickedBox) {
-    if (tool === "screwdriver") {
-      showToast("A WAGO dobozhoz válaszd a Kéz eszközt!");
-      return;
-    }
-    if (tool === "cutter") {
-      return;
-    }
-    const w = 18 + clickedBox.slots * 24;
-    const h = 66;
-    const newWago = spawnWago(world, clickedBox.slots, p.x - w / 2, p.y - h / 2);
-    draggedWago = {
-      id: newWago.id,
-      startX: p.x,
-      startY: p.y,
-      ox: w / 2,
-      oy: h / 2,
-      moved: false,
-      isNewSpawn: true,
-      boxSlots: clickedBox.slots,
-    };
-    draw();
     return;
   }
 
@@ -875,33 +951,37 @@ canvas.addEventListener("pointermove", (event) => {
   }
 
   hoveredWagoBoxSlots = hitWagoBox(p)?.slots;
+  hoverSpoolColor = hitWorkbenchSpool(p)?.color;
+  hoverWorkbenchTool = hitWorkbenchTool(p)?.tool;
+  hoverWorkbenchTester = hitWorkbenchTester(p);
+  hoverWorkbenchClamp = hitWorkbenchClamp(p);
+  hoverLegendSheet = hitWorkbenchLegendSheet(p);
+  const overUiHotspot = hitLegendPoster(p) || hitAnyWorkbenchInteractive(p);
 
   if (tool === "tester") {
-    hoverProbeTarget = hitProbeTarget(world, p);
+    hoverProbeTarget = overUiHotspot ? undefined : hitProbeTarget(world, p);
     hoverClampTarget = undefined;
     hoverPortId = hoverProbeTarget?.portId;
     hoverWireId = undefined;
     hoveredWagoId = undefined;
     updateTester();
-    canvas.style.cursor =
-      hitLegendPoster(p) || hitWorkbenchClamp(p) || hoverProbeTarget
-        ? "pointer"
-        : cursorFor(tool, isPanning);
+    canvas.style.cursor = overUiHotspot
+      ? "pointer"
+      : cursorFor(tool, isPanning, wireColor);
     draw();
     return;
   }
 
   if (tool === "clamp") {
-    hoverClampTarget = hitClampTarget(world, p);
+    hoverClampTarget = overUiHotspot ? undefined : hitClampTarget(world, p);
     hoverProbeTarget = undefined;
     hoverPortId = undefined;
     hoverWireId = hoverClampTarget?.wireId;
     hoveredWagoId = undefined;
     updateClamp();
-    canvas.style.cursor =
-      hitLegendPoster(p) || hitWorkbenchTester(p) || hoverClampTarget
-        ? "pointer"
-        : cursorFor(tool, isPanning);
+    canvas.style.cursor = overUiHotspot
+      ? "pointer"
+      : cursorFor(tool, isPanning, wireColor);
     draw();
     return;
   }
@@ -917,12 +997,7 @@ canvas.addEventListener("pointermove", (event) => {
   const hoveredWago = hitWago(world, p);
   hoveredWagoId = hoveredWago?.id;
 
-  if (
-    hitLegendPoster(p) ||
-    hitWagoRotateButton(world, p) ||
-    hitWorkbenchTester(p) ||
-    hitWorkbenchClamp(p)
-  ) {
+  if (overUiHotspot || hitWagoRotateButton(world, p)) {
     canvas.style.cursor = "pointer";
   } else if (tool === "hand") {
     if (hitWagoLever(world, p)) {
@@ -932,20 +1007,22 @@ canvas.addEventListener("pointermove", (event) => {
     } else if (hitDevice(world, p)) {
       canvas.style.cursor = "pointer";
     } else {
-      canvas.style.cursor = cursorFor(tool, isPanning);
+      canvas.style.cursor = cursorFor(tool, isPanning, wireColor);
     }
   } else if (tool === "wire") {
-    if (nearestPort(world, p) || hitColumnLowerHalf(world, p)) {
-      canvas.style.cursor = "crosshair";
-    } else if (hoveredWago && !hasWagoWires(world, hoveredWago.id)) {
+    if (
+      !nearestPort(world, p) &&
+      !hitColumnLowerHalf(world, p) &&
+      hoveredWago &&
+      !hoveredWago.fixed &&
+      !hasWagoWires(world, hoveredWago.id)
+    ) {
       canvas.style.cursor = "grab";
     } else {
-      canvas.style.cursor = cursorFor(tool, isPanning);
+      canvas.style.cursor = cursorFor(tool, isPanning, wireColor);
     }
-  } else if (hitWagoBox(p)) {
-    canvas.style.cursor = "pointer";
   } else {
-    canvas.style.cursor = cursorFor(tool, isPanning);
+    canvas.style.cursor = cursorFor(tool, isPanning, wireColor);
   }
 
   if (draft) {
@@ -994,13 +1071,15 @@ canvas.addEventListener("pointerup", (event) => {
     isPanning = false;
     liftProbesOnClickUp = false;
     detachClampOnClickUp = false;
-    canvas.style.cursor = cursorFor(tool);
+    canvas.style.cursor = cursorFor(tool, false, wireColor);
     if (shouldLiftProbes) {
       clearProbes();
+      paintToolbar();
       draw();
     }
     if (shouldDetachClamp) {
       clearClamp();
+      paintToolbar();
       draw();
     }
   }
@@ -1037,7 +1116,7 @@ canvas.addEventListener("pointerup", (event) => {
     draggedWago = undefined;
     pendingLeverPort = undefined;
     hoveredWagoBoxSlots = undefined;
-    canvas.style.cursor = cursorFor(tool);
+    canvas.style.cursor = cursorFor(tool, false, wireColor);
     draw();
   }
 
@@ -1066,6 +1145,12 @@ canvas.addEventListener("pointerleave", () => {
   hoverPortId = undefined;
   hoverWireId = undefined;
   hoveredWagoId = undefined;
+  hoveredWagoBoxSlots = undefined;
+  hoverSpoolColor = undefined;
+  hoverWorkbenchTool = undefined;
+  hoverWorkbenchTester = false;
+  hoverWorkbenchClamp = false;
+  hoverLegendSheet = false;
   if (tool === "tester" && blackProbe && !redProbe) {
     updateTester();
   }
@@ -1129,21 +1214,13 @@ toolbar.addEventListener("click", (event) => {
 
   const toolBtn = target.closest<HTMLButtonElement>("[data-tool]");
   if (toolBtn?.dataset.tool) {
-    tool = toolBtn.dataset.tool as ToolMode;
-    if (tool === "tester") {
-      instrumentPanel.show();
-    } else if (!blackProbe && !redProbe) {
-      instrumentPanel.hide();
-    }
-    if (tool === "clamp") {
-      clampPanel.show();
-    } else if (!clampedTarget && clampHoldValue === null) {
-      clampPanel.hide();
-    }
-    updateTester();
-    updateClamp();
-    paintToolbar();
-    draw();
+    selectTool(toolBtn.dataset.tool as ToolMode);
+    return;
+  }
+
+  const spoolBtn = target.closest<HTMLButtonElement>("[data-spool]");
+  if (spoolBtn?.dataset.spool) {
+    selectWireSpool(spoolBtn.dataset.spool as WireColorId);
     return;
   }
 
@@ -1197,6 +1274,11 @@ toolbar.addEventListener("click", (event) => {
     pendingLeverPort = undefined;
     hoveredWagoId = undefined;
     hoveredWagoBoxSlots = undefined;
+    hoverSpoolColor = undefined;
+    hoverWorkbenchTool = undefined;
+    hoverWorkbenchTester = false;
+    hoverWorkbenchClamp = false;
+    hoverLegendSheet = false;
     blackProbe = undefined;
     redProbe = undefined;
     hoverProbeTarget = undefined;
@@ -1213,24 +1295,7 @@ toolbar.addEventListener("click", (event) => {
     colorCheckPanel.hide();
     runSim();
     paintToolbar();
-    draw();
-  }
-});
-
-toolbar.addEventListener("change", (event) => {
-  const input = event.target as HTMLInputElement;
-  if (input.name === "color") {
-    wireColor = input.value as WireColorId;
-    tool = "wire";
-    if (!blackProbe && !redProbe) {
-      instrumentPanel.hide();
-    }
-    if (!clampedTarget && clampHoldValue === null) {
-      clampPanel.hide();
-    }
-    updateTester();
-    updateClamp();
-    paintToolbar();
+    canvas.style.cursor = cursorFor(tool, false, wireColor);
     draw();
   }
 });
@@ -1282,6 +1347,7 @@ requestAnimationFrame(animLoop);
 
 window.addEventListener("resize", resize);
 paintToolbar();
+canvas.style.cursor = cursorFor(tool, false, wireColor);
 resize();
 runSim();
 draw();
@@ -1292,6 +1358,7 @@ Object.defineProperty(window, "__simApp", {
     world,
     sim,
     tool,
+    wireColor,
     debug,
     blackProbe,
     redProbe,
@@ -1299,5 +1366,7 @@ Object.defineProperty(window, "__simApp", {
     clampedTarget,
     clampReading,
     clampHoldValue,
+    selectTool,
+    selectWireSpool,
   }),
 });

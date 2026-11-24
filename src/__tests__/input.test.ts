@@ -123,11 +123,18 @@ describe("Canvas input hit-testing & geometry", () => {
     expect(hitLegendPoster({ x: 800, y: 800 })).toBe(true);
     expect(hitLegendPoster({ x: 100, y: 100 })).toBe(false);
 
-    expect(cursorFor("wire", false)).toBe("crosshair");
-    expect(cursorFor("tester", false)).toBe("crosshair");
-    expect(cursorFor("clamp", false)).toBe("crosshair");
-    expect(cursorFor("screwdriver", false)).toBe("pointer");
-    expect(cursorFor("cutter", false)).toBe("not-allowed");
+    expect(cursorFor("wire", false, "L1")).toContain("data:image/svg+xml,");
+    expect(cursorFor("wire", false, "L1")).toMatch(/,\s*crosshair$/);
+    expect(cursorFor("wire", false, "N")).not.toBe(cursorFor("wire", false, "L1"));
+    expect(cursorFor("wire", false, "PE")).not.toBe(cursorFor("wire", false, "N"));
+    expect(cursorFor("tester", false)).toContain("data:image/svg+xml,");
+    expect(cursorFor("tester", false)).toMatch(/,\s*crosshair$/);
+    expect(cursorFor("clamp", false)).toContain("data:image/svg+xml,");
+    expect(cursorFor("clamp", false)).toMatch(/,\s*crosshair$/);
+    expect(cursorFor("screwdriver", false)).toContain("data:image/svg+xml,");
+    expect(cursorFor("screwdriver", false)).toMatch(/,\s*pointer$/);
+    expect(cursorFor("cutter", false)).toContain("data:image/svg+xml,");
+    expect(cursorFor("cutter", false)).toMatch(/,\s*crosshair$/);
     expect(cursorFor("hand", false)).toBe("grab");
     expect(cursorFor("wire", true)).toBe("grabbing");
     expect(cursorFor("clamp", true)).toBe("grabbing");
