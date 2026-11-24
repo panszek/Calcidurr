@@ -71,6 +71,8 @@ let hoveredWagoBoxSlots: 3 | 5 | undefined;
 let pendingLeverPort: Port | undefined;
 let pressedButtonId: string | undefined;
 let toastTimer = 0;
+let motorAngle = 0;
+let motorSpeed = 0;
 
 const legendViewer = new LegendTableViewer({
   onHoverCol: (colId) => {
@@ -241,6 +243,7 @@ function draw() {
     hoverWagoBoxSlots: hoveredWagoBoxSlots,
     draft: draft ? { points: draft.points, color: draft.color } : undefined,
     tooltip: hoverPortId ? tooltipForPort(hoverPortId) : undefined,
+    motorAngle,
   });
 }
 
@@ -379,7 +382,12 @@ canvas.addEventListener("pointerdown", (event) => {
       return;
     }
     if (isPortOccupied(world, port.id)) {
-      showToast("A kapocs már foglalt! Egy kapocspontba egyszerre egy vezeték köthető.");
+      const isMotorFactoryPort = world.wagos.some((w) => w.fixed && w.portIds[0] === port.id);
+      if (isMotorFactoryPort) {
+        showToast("A kapocs foglalt! Ide a motor gyári kábele van bekötve.");
+      } else {
+        showToast("A kapocs már foglalt! Egy kapocspontba egyszerre egy vezeték köthető.");
+      }
       return;
     }
     draft = { color: wireColor, points: [{ x: port.x, y: port.y }, p], startPortId: port.id };
@@ -442,13 +450,24 @@ canvas.addEventListener("pointerdown", (event) => {
 
     const clickedWago = hitWago(world, p);
     if (clickedWago) {
+      const lever = hitWagoLever(world, p);
+
       if (clickedWago.fixed) {
+        if (lever) {
+          if (clickedWago.portIds[0] === lever.id) {
+            showToast("A motor gyári bekötésű karja fixen zárt, nem bontható!");
+            return;
+          }
+          togglePortTight(world, lever.id);
+          runSim();
+          draw();
+          return;
+        }
         showToast("A motor WAGO-ja rögzített, nem mozgatható!");
         return;
       }
-      const isWired = hasWagoWires(world, clickedWago.id);
-      const lever = hitWagoLever(world, p);
 
+      const isWired = hasWagoWires(world, clickedWago.id);
       if (isWired) {
         if (lever) {
           togglePortTight(world, lever.id);
@@ -810,25 +829,43 @@ toolbar.addEventListener("change", (event) => {
   }
 });
 
-// Dynamic Animation & Simulation Loop for Timers
+// Dynamic Animation & Simulation Loop for Timers and Motor
 let lastTime = performance.now();
 function animLoop(now: number) {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
+
+  // Motor rotation speed and angle integration with inertia
+  const targetSpeed =
+    sim.motor?.mode === "star" || sim.motor?.mode === "delta"
+      ? (sim.motor.direction === "cw" ? 1.0 : -1.0)
+      : 0.0;
+
+  if (targetSpeed !== 0) {
+    motorSpeed += (targetSpeed - motorSpeed) * Math.min(1, dt * 5);
+  } else {
+    motorSpeed += (0 - motorSpeed) * Math.min(1, dt * 2.5);
+    if (Math.abs(motorSpeed) < 0.005) motorSpeed = 0;
+  }
+
+  if (motorSpeed !== 0) {
+    motorAngle = (motorAngle + motorSpeed * dt * 28) % (Math.PI * 2);
+  }
 
   const changed = tickWorld(world, dt);
   if (changed) {
     runSim();
     draw();
   } else {
-    // Redraw if any timer is actively running so numbers update
+    // Redraw if any timer is actively running so numbers update, or motor is spinning/vibrating
     const isAnyTimerRunning = world.devices.some(
       (d) =>
         (d.type === "staircase_relay" && (d.timerRemaining ?? 0) > 0) ||
         (d.type === "motion_sensor" && (d.timerRemaining ?? 0) > 0) ||
         (d.type === "timer_relay" && d.energized && !d.relayState),
     );
-    if (isAnyTimerRunning) {
+    const isMotorActive = Math.abs(motorSpeed) > 0 || sim.motor?.mode === "phase_fault";
+    if (isAnyTimerRunning || isMotorActive) {
       draw();
     }
   }

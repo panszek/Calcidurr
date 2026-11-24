@@ -318,7 +318,28 @@ flowchart LR
     - **Keresztbe kötött nulla fogyasztóknál:** ha egy terhelés (izzó, dugalj, mágneskapcsoló, relé) fázisa az egyik ÁVK-ról, nullája a másikról érkezik (pl. `1P L1` + `3F N`), vagy nullája `PE`-re van kötve, a hibaáram miatt mindkét/érintett ÁVK leold.
     - **Szelektív leoldás (`tripRcd`):** A gráfbejárás során forrás-ÁVK követés működik, így a hibák csak a közvetlenül érintett ÁVK-t oldják le, a másik független marad.
   - **Tesztek:** [`src/__tests__/rcd.test.ts`](file:///c:/Users/SIH6SS/Calcidurr/src/__tests__/rcd.test.ts) (13 teszt: kezdőállapotok, upstream tápfüggőség, T gomb hit-test és tesztelés, L-PE, N-PE, szelektív leoldás, 3F N - 1F N összekötés, keresztbe kötött nulla fogyasztónál, PE-re kötött fogyasztói nulla, szabályos működés és `tripRcd`) mind zöld.
-- [ ] **4. szál (3F Villanymotor):** 1. pont (3F motor animációval + poszter alatti 6+1 fix 3-as WAGO fekete/zöld-sárga kábelköteggel és fehér szigszalag feliratokkal) + `motor.test.ts`.
+- [x] **4. szál (3F Villanymotor) — KÉSZ (Motor animációval + 6+1 fix 3-as WAGO + Csillag/Delta/Fázishiba szimuláció):** Ipari 3 fázisú aszinkron villanymotor és a poszter alatti 6+1 db rögzített 3-as WAGO sora (`U1`, `V1`, `W1`, `U2`, `V2`, `W2` + `PE`) megvalósítva, kábelköteggel, fehér szigetelőszalag zászlócskákkal, forgásirány- és fázishiba-érzékeléssel, valósághű animációval és automatizált tesztekkel (`71/71` teszt + `npm run build` sikeres):
+  - **Canvas elrendezés és tömörített poszter (`src/canvas/renderer.ts`, `src/canvas/input.ts`):** A magyarázó plakát magassága tömörítve (`y = 700..945`), alatta (`y = 955..1060`) tágas hely nyílt a 6+1 db fix 3-as WAGO-nak (`x = 740..1460, y = 975`). A motor lent az alsó munkapad jobb oldalán (`x = 1750..2040, y = 1030..1280`) helyezkedik el, stabil szerelőtalpakkal és érintkezési árnyékkal a fa asztallapon, felette gégecsővel a poszter alatti WAGO-kig.
+  - **6+1 db rögzített 3-as WAGO és gyári kábelköteg (`src/data/prototypeTrack.ts`, `src/models/world.ts`, `src/canvas/renderer.ts`):**
+    - A motortól vastag fekete gégecső fut le a poszter alatt a WAGO-khoz.
+    - Mind a 7 WAGO 1. portjában gyárilag zárt (`tight: true`) bekötés van (6 db fekete tekercsvég + 1 db zöld-sárga PE ér).
+    - Minden ér felett fehér szigetelőszalag jelölőfül (zászlócska) látható a kivezetés kódjával (`U1`, `V1`, `W1`, `U2`, `V2`, `W2`, `PE`).
+    - A 2. és 3. port nyitott karral (`tight: false`) szabadon beköthető a tanuló által (áthidalók és betáplálás).
+    - **Védelem (`src/main.ts`):** A motor WAGO-i `fixed: true` jelöléssel védettek (nem mozgathatók, nem dobhatók vissza a dobozba), az 1. gyári karjuk nem bontható (toast figyelmeztetés), a 2. és 3. kar viszont szabadon működtethető Kéz eszközzel.
+  - **Elektromos szimulációs motor (`src/engine/simulation.ts`):**
+    - **Csillagüzem (Y):** `U2–V2–W2` áthidalva és `U1, V1, W1`-re `L1, L2, L3` kapcsolva -> `mode: "star"`, névleges áram `1.8 A`, `speed: 1`.
+    - **Deltaüzem (Δ):** mindhárom tekercs fázis–fázis (400V) táplálást kap háromszög-kötésben -> `mode: "delta"`, vonali áram `5.4 A`, `speed: 1`.
+    - **Forgásirány (`cw` / `ccw`):** ciklikus `L1–L2–L3` sorrendnél jobbra (`CW ↻`), két fázis felcserélésekor balra (`CCW ↺`).
+    - **Fázishiba (`phase_fault`):** 1 fázis kiesése/lekötése esetén a motor nem forog (`speed: 0`), fázishiba állapotba lép, áramfelvétele megnő (`8.5 A`), a motor rezeg és toast/sim figyelmeztetés jelenik meg.
+    - **Földelés (PE) felügyelet:** Földelés nélküli motorüzem esetén biztonsági figyelmeztetés a szimulációban.
+    - **Zárlatvédelem:** Csillag és Delta egyidejű hibás kapcsolásakor a kismegszakító azonnal leold.
+    - **Mágneskapcsolós Csillag-Delta indítás:** `MK1` (Fő) + `MK2` (Csillag) és `MK1` + `MK3` (Delta) kontaktorokon keresztül teljes körűen működik.
+  - **Vizuális megjelenítés és animáció (`src/canvas/renderer.ts`, `src/main.ts`):**
+    - Bordázott öntvény motorház 8 db hűtőbordával, szerelőtalpakkal, emelőszemmel és kapocsházzal (tömszelencével és PE állapotjelző LED-del).
+    - Csapágypajzs, ventilátor rács és forgó lapátkerék: valósághű gyorsulással és lassulási tehetetlenséggel forog, zöld `CW ↻` vagy cián `CCW ↺` forgásirány-nyíllal.
+    - Fázishiba esetén a motor mechanikusan vibrál/rezeg a képernyőn.
+    - Digitális LED állapotkijelző panel a motor tetején (`ÁLL (0.0 A)`, `Y ↻ CSILLAG 1.8 A`, `Δ ↻ DELTA 5.4 A`, `⚡ FÁZISHIBA! 8.5 A`).
+  - **Tesztek:** [`src/__tests__/motor.test.ts`](file:///c:/Users/SIH6SS/Calcidurr/src/__tests__/motor.test.ts) (10 teszt: inicializálás, védelem, direkt Csillag üzem, forgásirány-váltás, hiányzó PE figyelmeztetés, fázishiba, direkt Delta üzem, nyitott tekercsek, mágneskapcsolós Csillag-Delta átkapcsolás és Y+Δ egyidejű zárlatvédelem) mind zöld.
 - [ ] **5. szál (Kábelszín validáció):** 5. pont (fekete / kék / zöld-sárga szabályrendszer + hibaösszesítő és Canvas kiemelés) + `colorCheck.test.ts`.
 - [ ] **6. szál (UNI-T vizsgáló):** 2. pont (feszültség- és folytonosságvizsgáló + hang + közös lebegő műszerpanel) + `measurements.test.ts`.
 - [ ] **7. szál (Lakatfogó):** 4. pont (fázor áramhálózat-megoldó + lakatfogó pofa és kijelző) + `currentSolver.test.ts`.

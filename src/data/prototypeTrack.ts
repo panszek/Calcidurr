@@ -6,6 +6,7 @@ import type {
   WagoBlock,
   World,
 } from "../models/types";
+import { getWagoPortPos } from "../models/world";
 
 const COL_W = 20;
 const COL_H = 138;
@@ -245,6 +246,15 @@ export function createPrototypeWorld(): World {
     pir_l: node("pir_l", "Mozgásérzékelő", "L↑ betáp", "L↑"),
     pir_n: node("pir_n", "Mozgásérzékelő", "N↑ betáp", "N↑"),
     pir_out: node("pir_out", "Mozgásérzékelő", "L↓ kapcsolt fázis", "L↓"),
+
+    // 18. 3 Fázisú villanymotor tekercs és védővezető kivezetései: [U1, V1, W1, U2, V2, W2, PE]
+    motor_u1: node("motor_u1", "3F Villanymotor", "U1 tekercs kivezetés", "U1"),
+    motor_v1: node("motor_v1", "3F Villanymotor", "V1 tekercs kivezetés", "V1"),
+    motor_w1: node("motor_w1", "3F Villanymotor", "W1 tekercs kivezetés", "W1"),
+    motor_u2: node("motor_u2", "3F Villanymotor", "U2 tekercs kivezetés", "U2"),
+    motor_v2: node("motor_v2", "3F Villanymotor", "V2 tekercs kivezetés", "V2"),
+    motor_w2: node("motor_w2", "3F Villanymotor", "W2 tekercs kivezetés", "W2"),
+    motor_pe: node("motor_pe", "3F Villanymotor", "PE védővezető kivezetés", "PE"),
   };
 
   // Pozíciók a pelda_kotes.jpg alapján
@@ -483,8 +493,51 @@ export function createPrototypeWorld(): World {
     );
   }
 
-  // A szabad fal induláskor Wago nélkül indul (a WAGO dobozokból húzható ki)
+  // 3 fázisú villanymotor 6+1 db fix 3-as WAGO-ja a poszter alatt (y = 975)
+  // 1. port gyárilag zárt/bekötött (tight: true), 2-3. port nyitott karral szabadon köthető
+  const motorWagoDefs = [
+    { id: "wago_motor_u1", nodeId: "motor_u1", x: 740, label: "U1" },
+    { id: "wago_motor_v1", nodeId: "motor_v1", x: 845, label: "V1" },
+    { id: "wago_motor_w1", nodeId: "motor_w1", x: 950, label: "W1" },
+    { id: "wago_motor_u2", nodeId: "motor_u2", x: 1055, label: "U2" },
+    { id: "wago_motor_v2", nodeId: "motor_v2", x: 1160, label: "V2" },
+    { id: "wago_motor_w2", nodeId: "motor_w2", x: 1265, label: "W2" },
+    { id: "wago_motor_pe", nodeId: "motor_pe", x: 1390, label: "PE" },
+  ];
+
   const wagos: WagoBlock[] = [];
+  const motorWagoY = 975;
+  for (const def of motorWagoDefs) {
+    const portIds = [
+      `${def.id}_p1`,
+      `${def.id}_p2`,
+      `${def.id}_p3`,
+    ];
+    const wagoBlock: WagoBlock = {
+      id: def.id,
+      nodeId: def.nodeId,
+      x: def.x,
+      y: motorWagoY,
+      portIds,
+      slots: 3,
+      fixed: true,
+      rotation: 0,
+    };
+    wagos.push(wagoBlock);
+
+    portIds.forEach((pid, idx) => {
+      const pos = getWagoPortPos(wagoBlock, idx);
+      ports[pid] = {
+        id: pid,
+        nodeId: def.nodeId,
+        kind: "wago",
+        x: pos.x,
+        y: pos.y,
+        label: `${def.label}:${idx + 1}`,
+        tight: idx === 0, // 1. gyári ér bekötve és rögzítve
+      };
+    });
+  }
 
   // Interaktív és vizuális készülékek elhelyezése a pelda_kotes.jpg alapján:
   const devices: Device[] = [
@@ -873,6 +926,22 @@ export function createPrototypeWorld(): World {
       pressed: false,
       energized: false,
       subType: "nc",
+    },
+
+    // 7. 3 fázisú villanymotor az alsó munkapadon
+    {
+      id: "dev_motor",
+      type: "motor_3p",
+      title: "3F Villanymotor",
+      bounds: { x: 1750, y: 1030, w: 290, h: 250 },
+      nodeIds: [
+        "motor_u1", "motor_v1", "motor_w1",
+        "motor_u2", "motor_v2", "motor_w2",
+        "motor_pe",
+      ],
+      on: false,
+      pressed: false,
+      energized: false,
     },
   ];
 

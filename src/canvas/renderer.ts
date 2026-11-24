@@ -3,7 +3,7 @@ import { UPPER_TERMINAL_GROUPS, LOWER_TERMINAL_GROUPS } from "../data/terminalLe
 import { WAGO_BOXES } from "../data/wagoBoxes";
 import { isWireLive } from "../engine/simulation";
 import { hasWagoWires, isWireEndSecure } from "../models/world";
-import type { Point, Port, SimState, TerminalColumn, ToolMode, World } from "../models/types";
+import type { Device, Point, Port, SimState, TerminalColumn, ToolMode, World } from "../models/types";
 
 export interface RenderExtras {
   debug: boolean;
@@ -15,6 +15,8 @@ export interface RenderExtras {
   hoverWagoBoxSlots?: 3 | 5;
   draft?: { points: Point[]; color: keyof typeof WIRE_COLORS };
   tooltip?: { x: number; y: number; lines: string[] };
+  motorAngle?: number;
+  motorVibration?: number;
 }
 
 function roundRect(
@@ -166,9 +168,9 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   // 2. Sorkapocs-kiosztás plakát (Poster on the board under wagos)
   ctx.save();
   const px = 680;
-  const py = 725;
+  const py = 700;
   const pw = 1460;
-  const ph = 315;
+  const ph = 245;
   // White laminated paper
   roundRect(ctx, px, py, pw, ph, 4);
   ctx.fillStyle = "#ffffff";
@@ -182,29 +184,29 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 
   // Header banner on poster
-  roundRect(ctx, px + 2, py + 2, pw - 4, 30, 3);
+  roundRect(ctx, px + 2, py + 2, pw - 4, 26, 3);
   ctx.fillStyle = "#1e293b";
   ctx.fill();
 
   ctx.fillStyle = "#f8fafc";
-  ctx.font = "800 12px Segoe UI";
+  ctx.font = "800 11.5px Segoe UI";
   ctx.textAlign = "left";
-  ctx.fillText("OKTATÓFALI SORKAPOCS-KIOSZTÁSI JEGYZÉK (KAPCSOLÁSI TERV ÉS SZÍNKÓDOK)", px + 18, py + 21);
+  ctx.fillText("OKTATÓFALI SORKAPOCS-KIOSZTÁSI JEGYZÉK (KAPCSOLÁSI TERV ÉS SZÍNKÓDOK)", px + 18, py + 18);
 
   // Clickable badge prompt
-  roundRect(ctx, px + pw - 340, py + 5, 324, 22, 4);
+  roundRect(ctx, px + pw - 340, py + 4, 324, 20, 4);
   ctx.fillStyle = "#0284c7";
   ctx.fill();
   ctx.fillStyle = "#ffffff";
-  ctx.font = "700 10.5px Segoe UI";
+  ctx.font = "700 10px Segoe UI";
   ctx.textAlign = "center";
-  ctx.fillText("📋 KATTINTS IDE A NAGYÍTOTT JEGYZÉKHEZ", px + pw - 178, py + 20);
+  ctx.fillText("📋 KATTINTS IDE A NAGYÍTOTT JEGYZÉKHEZ", px + pw - 178, py + 18);
 
   // FELSŐ SORKAPOCSSOR (X1 • 65 db sorkapocs) - Részletes rajzolat
   ctx.fillStyle = "#1e293b";
-  ctx.font = "800 10.5px Segoe UI";
+  ctx.font = "800 10px Segoe UI";
   ctx.textAlign = "left";
-  ctx.fillText("FELSŐ SORKAPOCSSOR (X1 • 65 db kapocs) — TÁPOK, KISMEGSZAKÍTÓK, RELÉK, MÁGNESKAPCSOLÓK, MOTORVÉDŐ", px + 18, py + 48);
+  ctx.fillText("FELSŐ SORKAPOCSSOR (X1 • 65 db kapocs) — TÁPOK, KISMEGSZAKÍTÓK, RELÉK, MÁGNESKAPCSOLÓK, MOTORVÉDŐ", px + 18, py + 40);
 
   const tableStartX = px + 16;
   const tableW = pw - 32;
@@ -219,14 +221,14 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
     // Group outline
     ctx.strokeStyle = "#cbd5e1";
     ctx.lineWidth = 1;
-    ctx.strokeRect(grpX, py + 54, grpW, 58);
+    ctx.strokeRect(grpX, py + 44, grpW, 48);
 
     // Group title
     const displayTitle = formatPosterGroupTitle(group.title);
     ctx.fillStyle = "#1e293b";
     ctx.textAlign = "center";
-    ctx.font = displayTitle.length <= 4 ? "800 9px Segoe UI" : "700 8px Segoe UI";
-    ctx.fillText(displayTitle, grpX + grpW / 2, py + 66);
+    ctx.font = displayTitle.length <= 4 ? "800 8.5px Segoe UI" : "700 7.5px Segoe UI";
+    ctx.fillText(displayTitle, grpX + grpW / 2, py + 54);
 
     // Terminals in group
     for (let tIdx = 0; tIdx < grpCount; tIdx++) {
@@ -235,14 +237,14 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
 
       // Pin label
       ctx.fillStyle = "#0f172a";
-      ctx.font = "800 8.5px Segoe UI";
+      ctx.font = "800 8px Segoe UI";
       ctx.textAlign = "center";
-      ctx.fillText(term.label, tx + colWTop / 2, py + 80);
+      ctx.fillText(term.label, tx + colWTop / 2, py + 66);
 
       // Color mark square
       const swatchCol = MARK_FILL[term.mark] ?? "#94a3b8";
       ctx.fillStyle = swatchCol;
-      roundRect(ctx, tx + 2, py + 86, colWTop - 4, 20, 2);
+      roundRect(ctx, tx + 2, py + 71, colWTop - 4, 17, 2);
       ctx.fill();
       ctx.strokeStyle = "rgba(0,0,0,0.25)";
       ctx.lineWidth = 0.8;
@@ -254,11 +256,11 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
 
   // ALSÓ SORKAPOCSSOR (X2 • 54 db sorkapocs) - Részletes rajzolat
   ctx.fillStyle = "#1e293b";
-  ctx.font = "800 10.5px Segoe UI";
+  ctx.font = "800 10px Segoe UI";
   ctx.textAlign = "left";
-  ctx.fillText("ALSÓ SORKAPOCSSOR (X2 • 54 db kapocs) — DUGALJ, KAPCSOLÓK (106, 107, 101N, 101, 102, 105), GOMBOK, IZZÓK, PIR", px + 18, py + 132);
+  ctx.fillText("ALSÓ SORKAPOCSSOR (X2 • 54 db kapocs) — DUGALJ, KAPCSOLÓK (106, 107, 101N, 101, 102, 105), GOMBOK, IZZÓK, PIR", px + 18, py + 105);
 
-  const colWBot = (colWTop * 65) / 54; // vagy a teljes tábla szélessége alapján
+  const colWBot = (colWTop * 65) / 54;
   let curBotColIdx = 0;
   for (const group of LOWER_TERMINAL_GROUPS) {
     const grpCount = group.terminals.length;
@@ -268,14 +270,14 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
     // Group outline
     ctx.strokeStyle = "#cbd5e1";
     ctx.lineWidth = 1;
-    ctx.strokeRect(grpX, py + 138, grpW, 58);
+    ctx.strokeRect(grpX, py + 110, grpW, 48);
 
     // Group title
     const displayTitle = formatPosterGroupTitle(group.title);
     ctx.fillStyle = "#1e293b";
     ctx.textAlign = "center";
-    ctx.font = displayTitle.length <= 4 ? "800 9.5px Segoe UI" : "700 8px Segoe UI";
-    ctx.fillText(displayTitle, grpX + grpW / 2, py + 150);
+    ctx.font = displayTitle.length <= 4 ? "800 9px Segoe UI" : "700 7.5px Segoe UI";
+    ctx.fillText(displayTitle, grpX + grpW / 2, py + 120);
 
     // Terminals in group
     for (let tIdx = 0; tIdx < grpCount; tIdx++) {
@@ -284,14 +286,14 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
 
       // Pin label
       ctx.fillStyle = "#0f172a";
-      ctx.font = "800 8.5px Segoe UI";
+      ctx.font = "800 8px Segoe UI";
       ctx.textAlign = "center";
-      ctx.fillText(term.label, tx + colWBot / 2, py + 164);
+      ctx.fillText(term.label, tx + colWBot / 2, py + 132);
 
       // Color mark square
       const swatchCol = MARK_FILL[term.mark] ?? "#94a3b8";
       ctx.fillStyle = swatchCol;
-      roundRect(ctx, tx + 2, py + 170, colWBot - 4, 20, 2);
+      roundRect(ctx, tx + 2, py + 137, colWBot - 4, 17, 2);
       ctx.fill();
       ctx.strokeStyle = "rgba(0,0,0,0.25)";
       ctx.lineWidth = 0.8;
@@ -303,12 +305,12 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
 
   // Bekötési és használati útmutató lábléc a plakáton
   ctx.fillStyle = "#475569";
-  ctx.font = "600 10.5px Segoe UI";
+  ctx.font = "600 9.5px Segoe UI";
   ctx.textAlign = "left";
-  ctx.fillText("Bekötési logika: A sorkapcsok felső oldala gyárilag bekötött (fix fali átvezetés). A kapcsolási vezetéket kizárólag az ALSÓ nyílásba kösd be, és az alsó csavart húzd meg csavarhúzóval!", px + 18, py + 235);
+  ctx.fillText("Bekötési logika: A sorkapcsok felső oldala gyárilag bekötött (fix fali átvezetés). A kapcsolási vezetéket kizárólag az ALSÓ nyílásba kösd be, és az alsó csavart húzd meg csavarhúzóval!", px + 18, py + 175);
   ctx.fillStyle = "#0284c7";
-  ctx.font = "700 10.5px Segoe UI";
-  ctx.fillText("Tipp: A felső menüsorban lévő '📋 Sorkapocs tábla' gombra vagy közvetlenül a fenti plakátra kattintva megnyílik a teljes függőleges feliratozású segédtáblázat.", px + 18, py + 255);
+  ctx.font = "700 9.5px Segoe UI";
+  ctx.fillText("Tipp: A felső menüsorban lévő '📋 Sorkapocs tábla' gombra vagy közvetlenül a fenti plakátra kattintva megnyílik a teljes függőleges feliratozású segédtáblázat.", px + 18, py + 192);
 
   // Thumbtacks in 4 corners
   const drawPin = (tx: number, ty: number) => {
@@ -433,6 +435,79 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#1f2937";
   ctx.fill();
 
+  ctx.restore();
+
+  // 4. Motor WAGO kábelköteg a poszter alatt (y = 940) és leállás a motorkapocsházhoz (y = 1122)
+  ctx.save();
+  // Vastag ipari fekete gégecső/motorkábel a motor kapocsházától a WAGO-kig
+  ctx.beginPath();
+  ctx.moveTo(1775, 1122);
+  ctx.bezierCurveTo(1775, 1010, 1630, 940, 1450, 940);
+  ctx.lineTo(758, 940);
+  ctx.lineWidth = 14;
+  ctx.strokeStyle = "#1e293b";
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  // Gégecső belső bordázat kiemelése
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#334155";
+  ctx.stroke();
+
+  // 7 db gyári bekötő ér a 6+1 WAGO 1. portjába
+  const motorWireDrops = [
+    { x: 740 + 18, label: "U1", color: "#111827", isPe: false },
+    { x: 845 + 18, label: "V1", color: "#111827", isPe: false },
+    { x: 950 + 18, label: "W1", color: "#111827", isPe: false },
+    { x: 1055 + 18, label: "U2", color: "#111827", isPe: false },
+    { x: 1160 + 18, label: "V2", color: "#111827", isPe: false },
+    { x: 1265 + 18, label: "W2", color: "#111827", isPe: false },
+    { x: 1390 + 18, label: "PE", color: "#15803d", isPe: true },
+  ];
+
+  for (const drop of motorWireDrops) {
+    // Vezeték leállás a kábelből a WAGO 1. portjába
+    ctx.beginPath();
+    ctx.moveTo(drop.x, 940);
+    ctx.lineTo(drop.x, 975);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = drop.color;
+    ctx.stroke();
+
+    if (drop.isPe) {
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#eab308";
+      ctx.beginPath();
+      ctx.moveTo(drop.x, 940);
+      ctx.lineTo(drop.x, 975);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Fehér szigetelőszalag jelölőfül (zászlócska) a kivezetés kódjával
+    const flagW = 26;
+    const flagH = 14;
+    const flagX = drop.x - 2;
+    const flagY = 948;
+    roundRect(ctx, flagX, flagY, flagW, flagH, 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetY = 1;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#475569";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = drop.isPe ? "#15803d" : "#0f172a";
+    ctx.font = "800 8.5px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(drop.label, flagX + flagW / 2, flagY + flagH / 2);
+  }
   ctx.restore();
 }
 
@@ -906,9 +981,353 @@ function drawWagoBoxes(
   }
 }
 
-function drawDevices(ctx: CanvasRenderingContext2D, world: World, sim: SimState) {
+function drawMotor(
+  ctx: CanvasRenderingContext2D,
+  device: Device,
+  sim: SimState,
+  extras?: RenderExtras,
+) {
+  const { x, y, w } = device.bounds;
+  const motor = sim.motor;
+  const isPhaseFault = motor?.mode === "phase_fault";
+  const isRunning = motor?.mode === "star" || motor?.mode === "delta";
+  const isCw = motor?.direction === "cw";
+  const isCcw = motor?.direction === "ccw";
+
+  // Vibration translation if in phase fault
+  const vib = isPhaseFault ? Math.sin((extras?.motorVibration ?? Date.now()) * 0.05) * 2.5 : 0;
+
+  ctx.save();
+  ctx.translate(vib, 0);
+
+  // 1. Digital Status Display & Banner above motor
+  const dispX = x + 44;
+  const dispY = y + 5;
+  const dispW = w - 54;
+  const dispH = 46;
+
+  roundRect(ctx, dispX, dispY, dispW, dispH, 6);
+  ctx.fillStyle = isPhaseFault
+    ? "#3b0707"
+    : motor?.mode === "star"
+      ? "#022c22"
+      : motor?.mode === "delta"
+        ? "#451a03"
+        : "#0f172a";
+  ctx.fill();
+  ctx.strokeStyle = isPhaseFault
+    ? "#ef4444"
+    : motor?.mode === "star"
+      ? "#10b981"
+      : motor?.mode === "delta"
+        ? "#f59e0b"
+        : "#334155";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Status text lines
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  if (motor?.mode === "star") {
+    ctx.fillStyle = "#34d399";
+    ctx.font = "800 12px Segoe UI";
+    ctx.fillText(isCw ? "Y ↻ CSILLAG ÜZEM" : "Y ↺ CSILLAG ÜZEM", dispX + dispW / 2, dispY + 16);
+    ctx.font = "700 10px monospace";
+    ctx.fillStyle = "#a7f3d0";
+    ctx.fillText(`I = 1.8 A • 1420 RPM • ${motor.peConnected ? "PE OK" : "⚠️ PE HIÁNYZIK!"}`, dispX + dispW / 2, dispY + 33);
+  } else if (motor?.mode === "delta") {
+    ctx.fillStyle = "#fbbf24";
+    ctx.font = "800 12px Segoe UI";
+    ctx.fillText(isCw ? "Δ ↻ DELTA ÜZEM" : "Δ ↺ DELTA ÜZEM", dispX + dispW / 2, dispY + 16);
+    ctx.font = "700 10px monospace";
+    ctx.fillStyle = "#fde68a";
+    ctx.fillText(`I = 5.4 A • 1420 RPM • ${motor.peConnected ? "PE OK" : "⚠️ PE HIÁNYZIK!"}`, dispX + dispW / 2, dispY + 33);
+  } else if (isPhaseFault) {
+    ctx.fillStyle = "#f87171";
+    ctx.font = "900 12px Segoe UI";
+    ctx.fillText("⚡ FÁZISHIBA! ⚡", dispX + dispW / 2, dispY + 16);
+    ctx.font = "700 9.5px monospace";
+    ctx.fillStyle = "#fecaca";
+    ctx.fillText("I = 8.5 A • 2 FÁZIS (LEÁLLT)", dispX + dispW / 2, dispY + 33);
+  } else {
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "800 11px Segoe UI";
+    ctx.fillText("3~ ASZINKRON MOTOR", dispX + dispW / 2, dispY + 16);
+    ctx.font = "700 10px monospace";
+    ctx.fillStyle = "#64748b";
+    ctx.fillText(`ÁLLAPOT: ÁLL (0.0 A) • ${motor?.peConnected ? "PE OK" : "PE HIÁNY"}`, dispX + dispW / 2, dispY + 33);
+  }
+
+  // Motor shadow on the wooden workbench
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(x + 130, y + 246, 120, 14, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+  ctx.fill();
+  ctx.restore();
+
+  // 2. Mounting brackets / feet
+  const footY = y + 225;
+  const footH = 22;
+  const drawFoot = (fx: number, fw: number) => {
+    roundRect(ctx, fx, footY, fw, footH, 4);
+    ctx.fillStyle = "#334155";
+    ctx.fill();
+    ctx.strokeStyle = "#1e293b";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Bolts
+    ctx.beginPath();
+    ctx.arc(fx + fw / 2, footY + footH / 2, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fill();
+    ctx.strokeStyle = "#475569";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  };
+  drawFoot(x + 12, 42);
+  drawFoot(x + 155, 42);
+
+  // 3. Cast iron cylindrical stator body
+  const bodyX = x + 24;
+  const bodyY = y + 68;
+  const bodyW = 145;
+  const bodyH = 158;
+
+  // Stator shadow and gradient
+  ctx.save();
+  const bodyGrad = ctx.createLinearGradient(bodyX, bodyY, bodyX, bodyY + bodyH);
+  bodyGrad.addColorStop(0, "#2c4a6f");
+  bodyGrad.addColorStop(0.3, "#1e3a5f");
+  bodyGrad.addColorStop(0.8, "#0f233d");
+  bodyGrad.addColorStop(1, "#071322");
+
+  roundRect(ctx, bodyX, bodyY, bodyW, bodyH, 10);
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+  ctx.strokeStyle = isRunning ? "#38bdf8" : isPhaseFault ? "#ef4444" : "#1e293b";
+  ctx.lineWidth = isRunning ? 2 : 1.5;
+  ctx.stroke();
+
+  // Cooling fins (8 horizontal ribs across stator body)
+  for (let i = 0; i < 8; i++) {
+    const finY = bodyY + 16 + i * 16;
+    // Fin highlight line
+    ctx.fillStyle = "#4b729f";
+    ctx.fillRect(bodyX + 4, finY, bodyW - 8, 2.5);
+    // Fin shadow groove
+    ctx.fillStyle = "#071526";
+    ctx.fillRect(bodyX + 4, finY + 2.5, bodyW - 8, 3.5);
+  }
+
+  // Lifting eye (emelőszem) on top of stator
+  const eyeX = bodyX + bodyW / 2;
+  const eyeY = bodyY - 2;
+  ctx.beginPath();
+  ctx.arc(eyeX, eyeY - 6, 8, 0, Math.PI * 2);
+  ctx.fillStyle = "#475569";
+  ctx.fill();
+  ctx.strokeStyle = "#1e293b";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(eyeX, eyeY - 6, 4, 0, Math.PI * 2);
+  ctx.fillStyle = "#c29c67"; // background OSB showing through hole
+  ctx.fill();
+  ctx.stroke();
+
+  // Rating nameplate (adattábla) on stator
+  const plateX = bodyX + 10;
+  const plateY = bodyY + 68;
+  const plateW = 76;
+  const plateH = 46;
+  roundRect(ctx, plateX, plateY, plateW, plateH, 3);
+  ctx.fillStyle = "#e2e8f0";
+  ctx.fill();
+  ctx.strokeStyle = "#64748b";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "800 6.5px Segoe UI";
+  ctx.textAlign = "center";
+  ctx.fillText("3~ MOT. • 50 Hz", plateX + plateW / 2, plateY + 10);
+  ctx.font = "700 6px monospace";
+  ctx.fillText("Y 400V 1.8A", plateX + plateW / 2, plateY + 21);
+  ctx.fillText("Δ 400V 5.4A", plateX + plateW / 2, plateY + 30);
+  ctx.fillText("0.75kW 1420rpm", plateX + plateW / 2, plateY + 39);
+
+  // 4. Terminal Box (kapocsház) on the left
+  const tbX = bodyX - 18;
+  const tbY = bodyY + 30;
+  const tbW = 38;
+  const tbH = 68;
+  roundRect(ctx, tbX, tbY, tbW, tbH, 5);
+  ctx.fillStyle = "#1e293b";
+  ctx.fill();
+  ctx.strokeStyle = "#334155";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Screws on terminal box
+  ctx.fillStyle = "#64748b";
+  ctx.fillRect(tbX + 4, tbY + 4, 3, 3);
+  ctx.fillRect(tbX + tbW - 7, tbY + 4, 3, 3);
+  ctx.fillRect(tbX + 4, tbY + tbH - 7, 3, 3);
+  ctx.fillRect(tbX + tbW - 7, tbY + tbH - 7, 3, 3);
+
+  // Warning lightning bolt on terminal box
+  ctx.fillStyle = "#eab308";
+  ctx.font = "900 13px Segoe UI";
+  ctx.textAlign = "center";
+  ctx.fillText("⚡", tbX + tbW / 2, tbY + 28);
+
+  // PE Earth symbol and LED
+  ctx.fillStyle = motor?.peConnected ? "#22c55e" : "#ef4444";
+  ctx.beginPath();
+  ctx.arc(tbX + tbW / 2, tbY + 52, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Cable gland (tömszelence) on terminal box top where black conduit enters
+  const glandX = tbX + 10;
+  const glandY = tbY - 10;
+  roundRect(ctx, glandX, glandY, 18, 12, 2);
+  ctx.fillStyle = "#d97706";
+  ctx.fill();
+  ctx.strokeStyle = "#92400e";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // 5. Front bearing end-shield (csapágypajzs) and cooling fan
+  const shieldCx = bodyX + bodyW + 8;
+  const shieldCy = bodyY + bodyH / 2;
+  const shieldR = 56;
+
+  ctx.beginPath();
+  ctx.arc(shieldCx, shieldCy, shieldR, 0, Math.PI * 2);
+  ctx.fillStyle = "#1e3a5f";
+  ctx.fill();
+  ctx.strokeStyle = isRunning ? "#38bdf8" : "#0f172a";
+  ctx.lineWidth = isRunning ? 2.5 : 2;
+  ctx.stroke();
+
+  // Perimeter flange bolts
+  for (let b = 0; b < 6; b++) {
+    const bAngle = (b * Math.PI) / 3;
+    const bx = shieldCx + Math.cos(bAngle) * (shieldR - 7);
+    const by = shieldCy + Math.sin(bAngle) * (shieldR - 7);
+    ctx.beginPath();
+    ctx.arc(bx, by, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fill();
+    ctx.strokeStyle = "#475569";
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+
+  // Recessed fan cavity
+  ctx.beginPath();
+  ctx.arc(shieldCx, shieldCy, shieldR - 14, 0, Math.PI * 2);
+  ctx.fillStyle = "#090d16";
+  ctx.fill();
+  ctx.strokeStyle = "#334155";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Rotating fan blades
+  const motorAngle = extras?.motorAngle ?? 0;
+  ctx.save();
+  ctx.translate(shieldCx, shieldCy);
+  ctx.rotate(motorAngle);
+
+  // 6 curved fan blades
+  for (let i = 0; i < 6; i++) {
+    const bladeAngle = (i * Math.PI) / 3;
+    ctx.save();
+    ctx.rotate(bladeAngle);
+    ctx.beginPath();
+    ctx.moveTo(8, -3);
+    ctx.quadraticCurveTo(24, -12, 36, -4);
+    ctx.lineTo(36, 4);
+    ctx.quadraticCurveTo(24, -4, 8, 3);
+    ctx.closePath();
+    ctx.fillStyle = isRunning ? "rgba(56, 189, 248, 0.75)" : "#475569";
+    ctx.fill();
+    ctx.strokeStyle = isRunning ? "#0284c7" : "#334155";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Center rotor shaft hub and keyway
+  ctx.beginPath();
+  ctx.arc(0, 0, 11, 0, Math.PI * 2);
+  ctx.fillStyle = "#94a3b8";
+  ctx.fill();
+  ctx.strokeStyle = "#475569";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Keyway slot
+  ctx.fillStyle = "#1e293b";
+  ctx.fillRect(-2.5, -11, 5, 6);
+  ctx.restore();
+
+  // 6. Direction arrow overlay around shaft
+  if (isRunning) {
+    ctx.save();
+    ctx.beginPath();
+    const arrowR = shieldR - 8;
+    if (isCw) {
+      ctx.arc(shieldCx, shieldCy, arrowR, -Math.PI * 0.65, Math.PI * 0.45, false);
+      ctx.strokeStyle = "#22c55e";
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+      // Arrowhead CW
+      const ax = shieldCx + Math.cos(Math.PI * 0.45) * arrowR;
+      const ay = shieldCy + Math.sin(Math.PI * 0.45) * arrowR;
+      ctx.beginPath();
+      ctx.moveTo(ax - 2, ay - 6);
+      ctx.lineTo(ax + 8, ay + 1);
+      ctx.lineTo(ax - 2, ay + 8);
+      ctx.fillStyle = "#22c55e";
+      ctx.fill();
+    } else if (isCcw) {
+      ctx.arc(shieldCx, shieldCy, arrowR, Math.PI * 0.45, -Math.PI * 0.65, true);
+      ctx.strokeStyle = "#06b6d4";
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+      // Arrowhead CCW
+      const ax = shieldCx + Math.cos(-Math.PI * 0.65) * arrowR;
+      const ay = shieldCy + Math.sin(-Math.PI * 0.65) * arrowR;
+      ctx.beginPath();
+      ctx.moveTo(ax + 2, ay - 6);
+      ctx.lineTo(ax - 8, ay + 1);
+      ctx.lineTo(ax + 2, ay + 8);
+      ctx.fillStyle = "#06b6d4";
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  ctx.restore(); // end of stator save
+  ctx.restore(); // end of vibration save
+}
+
+function drawDevices(ctx: CanvasRenderingContext2D, world: World, sim: SimState, extras?: RenderExtras) {
   for (const device of world.devices) {
     const { x, y, w, h } = device.bounds;
+
+    // 0. 3 fázisú villanymotor
+    if (device.type === "motor_3p") {
+      drawMotor(ctx, device, sim, extras);
+      continue;
+    }
 
     // 1. Három Izzó (Top-left ceiling fixtures)
     if (device.type === "lamp") {
@@ -1490,7 +1909,7 @@ export function renderWorld(
   }
 
   // Devices
-  drawDevices(ctx, world, sim);
+  drawDevices(ctx, world, sim, extras);
 
   // Wires
   for (const wire of world.wires) {

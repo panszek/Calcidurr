@@ -169,3 +169,25 @@ A prototípus validációja és a valós fotó (`sources/sorkapocs_kiosztas.png`
   - `3F N ↔ 1F N` összekötés (párhuzamosított nulla ágak): mindkét ÁVK leold.
   - **Keresztbe kötött nulla fogyasztóknál:** ha egy terhelés fázisa az egyik ÁVK-ról, nullája a másikról érkezik (`1P L` + `3F N` vagy `3F L` + `1F N`), vagy ha a nulla helyett `PE`-re van kötve a fogyasztó, hibaáram miatt az ÁVK-k leoldanak.
   - **Szelektív leoldás:** a hiba csak a közvetlenül érintett védelmi eszközt oldja le.
+
+### 8.7. 3 Fázisú Villanymotor és 6+1 Fix WAGO Csatlakozás:
+- **Ipari motor elhelyezése (`x = 1750..2040, y = 1030..1280`):**
+  - Az alsó munkapad jobb szélén, a fa asztallapon elhelyezkedő bordázott ipari 3 fázisú aszinkron motor, szerelőtalpakkal és érintkezési árnyékkal.
+  - Vizuális felépítés: öntvény motorház 8 hűtőbordával, szerelőtalpak és rögzítőcsavarok, emelőszem, kapocsház felső tömszelencével és PE földelési LED-del, csapágypajzs, ventilátor rács és forgó lapátkerék.
+  - Dinamikus animáció: valósághű gyorsulással és lassulási tehetetlenséggel forog, forgásirány-kijelző nyíllal (`CW ↻` vagy `CCW ↺`).
+  - Fázishiba (`phase_fault`) esetén a motor mechanikusan vibrál/rezeg a képernyőn.
+  - Digitális LED állapotkijelző panel a motor tetején (`ÁLL (0.0 A)`, `Y ↻ CSILLAG 1.8 A`, `Δ ↻ DELTA 5.4 A`, `⚡ FÁZISHIBA! 8.5 A`).
+- **6+1 db rögzített 3-as WAGO a plakát alatt (`y = 975`, `x = 740..1460`):**
+  - A motortól vastag fekete gégecső fut fel a falra és a poszter alatt a 6+1 db 3-as WAGO-hoz.
+  - 6 tekercskivezetés: `U1`, `V1`, `W1`, `U2`, `V2`, `W2`.
+  - 1 védővezető kivezetés: `PE`.
+  - Mindegyik WAGO 1. portjában gyárilag zárt (`tight: true`) fekete vezeték (PE esetén zöld-sárga) csatlakozik a motorkábelből, felette fehér szigetelőszalag kivezetési zászlóval (`U1`..`W2` és `PE`).
+  - A 2. és 3. port nyitott karral (`tight: false`) indul, ide kötheti a tanuló a csillag/delta áthidalásokat és a betápláló/mágneskapcsoló vezetékeket.
+  - **Védelem:** A motor WAGO-i `fixed: true` jelölésűek (nem mozgathatók, nem törölhetők), az 1. gyári karjuk nem nyitható (toast figyelmeztetés), a 2. és 3. kar Kéz eszközzel szabadon kapcsolható.
+- **Elektromos szimulációs logika:**
+  - **Csillagüzem (Y):** `U2, V2, W2` egy pontba kötve (áthidalás vagy behúzott `MK2`), `U1, V1, W1`-re pedig 3 fázis (`L1, L2, L3`) jut -> motor forog, névleges áram `1.8 A`.
+  - **Deltaüzem (Δ):** mindhárom tekercs fázis–fázis (400V) háromszög-kapcsolást kap (`U1–W2, V1–U2, W1–V2` áthidalva vagy `MK1 + MK3`-on át) -> motor forog, vonali áram `5.4 A`.
+  - **Forgásirány (`CW` / `CCW`):** ciklikus `L1–L2–L3` sorrendnél jobbra (`CW`), két fázis felcserélésekor balra (`CCW`).
+  - **Fázishiba (`phase_fault`):** 1 fázis kiesése/lekötése esetén a motor nem forog (`speed: 0`), megnövekedett áramfelvétel (`8.5 A`), rezgés és figyelmeztetés.
+  - **PE földelés felügyelet:** Földelés nélküli motorüzem esetén figyelmeztetés.
+  - **Zárlatvédelem:** Csillag és Delta egyidejű hibás bekapcsolásakor (pl. `MK2` és `MK3` egyszerre behúzva) a kismegszakító azonnal leold.

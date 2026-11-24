@@ -123,9 +123,9 @@ export function hitColumnLowerHalf(world: World, p: Point) {
  */
 export function hitLegendPoster(p: Point): boolean {
   const px = 680;
-  const py = 725;
+  const py = 700;
   const pw = 1460;
-  const ph = 315;
+  const ph = 245;
   return p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph;
 }
 

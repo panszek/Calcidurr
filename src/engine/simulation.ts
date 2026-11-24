@@ -1,4 +1,4 @@
-import type { Potential, SimState, World } from "../models/types";
+import type { MotorState, Potential, SimState, World } from "../models/types";
 import { isWireEndSecure, tripMcb, tripRcd } from "../models/world";
 
 const LIVE: Potential[] = ["L1", "L2", "L3"];
@@ -368,6 +368,193 @@ function propagate(
   };
 }
 
+function areNodesConnected(adj: Map<string, string[]>, startId: string, targetId: string): boolean {
+  if (startId === targetId) return true;
+  const visited = new Set<string>();
+  const queue = [startId];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    if (cur === targetId) return true;
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    for (const next of adj.get(cur) ?? []) {
+      if (!visited.has(next)) {
+        queue.push(next);
+      }
+    }
+  }
+  return false;
+}
+
+function evaluateMotor(
+  world: World,
+  potential: Record<string, Potential>,
+  adj: Map<string, string[]>,
+): MotorState {
+  const defaultState: MotorState = {
+    mode: "off",
+    direction: "none",
+    speed: 0,
+    peConnected: false,
+    uPhase: "none",
+    vPhase: "none",
+    wPhase: "none",
+    current: 0,
+  };
+
+  const motor = world.devices.find((d) => d.type === "motor_3p");
+  if (!motor || motor.nodeIds.length < 7) {
+    return defaultState;
+  }
+
+  const [u1Id, v1Id, w1Id, u2Id, v2Id, w2Id, peId] = motor.nodeIds;
+  const pU1 = potential[u1Id] ?? "none";
+  const pV1 = potential[v1Id] ?? "none";
+  const pW1 = potential[w1Id] ?? "none";
+  const pU2 = potential[u2Id] ?? "none";
+  const pV2 = potential[v2Id] ?? "none";
+  const pW2 = potential[w2Id] ?? "none";
+  const pPE = potential[peId] ?? "none";
+
+  const peConnected = pPE === "PE";
+
+  // Check Star connection: U2, V2, W2 connected together
+  const isStarPoint =
+    areNodesConnected(adj, u2Id, v2Id) &&
+    areNodesConnected(adj, u2Id, w2Id);
+
+  // Check Reverse Star connection: U1, V1, W1 connected together
+  const isReverseStarPoint =
+    areNodesConnected(adj, u1Id, v1Id) &&
+    areNodesConnected(adj, u1Id, w1Id);
+
+  // 1. Regular Star mode (line supply on U1, V1, W1; star point at U2-V2-W2)
+  if (isStarPoint && !isReverseStarPoint) {
+    const inputPhases = [pU1, pV1, pW1];
+    const livePhases = inputPhases.filter((p) => LIVE.includes(p));
+    const uniqueLive = new Set(livePhases);
+
+    if (uniqueLive.size === 3) {
+      const isCw =
+        (pU1 === "L1" && pV1 === "L2" && pW1 === "L3") ||
+        (pU1 === "L2" && pV1 === "L3" && pW1 === "L1") ||
+        (pU1 === "L3" && pV1 === "L1" && pW1 === "L2");
+
+      return {
+        mode: "star",
+        direction: isCw ? "cw" : "ccw",
+        speed: 1,
+        peConnected,
+        uPhase: pU1,
+        vPhase: pV1,
+        wPhase: pW1,
+        current: 1.8,
+      };
+    } else if (uniqueLive.size === 2) {
+      return {
+        mode: "phase_fault",
+        direction: "none",
+        speed: 0,
+        peConnected,
+        uPhase: pU1,
+        vPhase: pV1,
+        wPhase: pW1,
+        current: 8.5,
+      };
+    } else {
+      return {
+        ...defaultState,
+        peConnected,
+        uPhase: pU1,
+        vPhase: pV1,
+        wPhase: pW1,
+      };
+    }
+  }
+
+  // 2. Reverse Star mode (line supply on U2, V2, W2; star point at U1-V1-W1)
+  if (isReverseStarPoint && !isStarPoint) {
+    const inputPhases = [pU2, pV2, pW2];
+    const livePhases = inputPhases.filter((p) => LIVE.includes(p));
+    const uniqueLive = new Set(livePhases);
+
+    if (uniqueLive.size === 3) {
+      const isCw =
+        (pU2 === "L1" && pV2 === "L2" && pW2 === "L3") ||
+        (pU2 === "L2" && pV2 === "L3" && pW2 === "L1") ||
+        (pU2 === "L3" && pV2 === "L1" && pW2 === "L2");
+
+      return {
+        mode: "star",
+        direction: isCw ? "cw" : "ccw",
+        speed: 1,
+        peConnected,
+        uPhase: pU2,
+        vPhase: pV2,
+        wPhase: pW2,
+        current: 1.8,
+      };
+    } else if (uniqueLive.size === 2) {
+      return {
+        mode: "phase_fault",
+        direction: "none",
+        speed: 0,
+        peConnected,
+        uPhase: pU2,
+        vPhase: pV2,
+        wPhase: pW2,
+        current: 8.5,
+      };
+    }
+  }
+
+  // 3. Delta mode
+  const coilUPotDiff = LIVE.includes(pU1) && LIVE.includes(pU2) && pU1 !== pU2;
+  const coilVPotDiff = LIVE.includes(pV1) && LIVE.includes(pV2) && pV1 !== pV2;
+  const coilWPotDiff = LIVE.includes(pW1) && LIVE.includes(pW2) && pW1 !== pW2;
+
+  if (coilUPotDiff && coilVPotDiff && coilWPotDiff) {
+    const isCw =
+      (pU1 === "L1" && pV1 === "L2" && pW1 === "L3") ||
+      (pU1 === "L2" && pV1 === "L3" && pW1 === "L1") ||
+      (pU1 === "L3" && pV1 === "L1" && pW1 === "L2");
+
+    return {
+      mode: "delta",
+      direction: isCw ? "cw" : "ccw",
+      speed: 1,
+      peConnected,
+      uPhase: pU1,
+      vPhase: pV1,
+      wPhase: pW1,
+      current: 5.4,
+    };
+  }
+
+  const allMotorPhases = [pU1, pV1, pW1, pU2, pV2, pW2].filter((p) => LIVE.includes(p));
+  const uniqueAllPhases = new Set(allMotorPhases);
+  if (uniqueAllPhases.size === 2 && (coilUPotDiff || coilVPotDiff || coilWPotDiff)) {
+    return {
+      mode: "phase_fault",
+      direction: "none",
+      speed: 0,
+      peConnected,
+      uPhase: pU1,
+      vPhase: pV1,
+      wPhase: pW1,
+      current: 8.5,
+    };
+  }
+
+  return {
+    ...defaultState,
+    peConnected,
+    uPhase: pU1,
+    vPhase: pV1,
+    wPhase: pW1,
+  };
+}
+
 export function simulate(world: World): SimState {
   const result = emptySim();
   let contactors = new Set<string>(
@@ -581,6 +768,27 @@ export function simulate(world: World): SimState {
 
   if (result.looseCount > 0) {
     result.warnings.push(`${result.looseCount} laza kötés (meghúzatlan csavar / nyitott Wago).`);
+  }
+
+  // Evaluate 3-phase induction motor
+  const finalAdj = neighborsOf(world, contactors);
+  const motorState = evaluateMotor(world, result.potential, finalAdj);
+  result.motor = motorState;
+
+  const motorDev = world.devices.find((d) => d.type === "motor_3p");
+  if (motorDev) {
+    motorDev.energized = motorState.mode !== "off";
+    motorDev.on = motorState.mode === "star" || motorState.mode === "delta";
+    if (motorDev.energized) {
+      result.activeDevices.add(motorDev.id);
+    }
+  }
+
+  if (motorState.mode === "phase_fault") {
+    result.warnings.push("3F Motor fázishiba: Aszimmetrikus 2 fázisú táplálás! A motor nem tud felpörögni és túlterhelődik.");
+  }
+  if (motorState.mode !== "off" && !motorState.peConnected) {
+    result.warnings.push("3F Motor: A védővezető (PE) nincs bekötve a motorhoz! Földelés nélkül nem üzemeltethető.");
   }
 
   return result;

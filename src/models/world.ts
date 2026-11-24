@@ -23,6 +23,11 @@ export function occupyingWire(world: World, portId: string) {
 }
 
 export function isPortOccupied(world: World, portId: string, ignoreWireId?: string) {
+  const port = world.ports[portId];
+  if (port) {
+    const fixedWago = world.wagos.find((w) => w.fixed && w.portIds[0] === portId);
+    if (fixedWago) return true;
+  }
   return world.wires.some(
     (wire) =>
       wire.id !== ignoreWireId &&
@@ -218,7 +223,8 @@ export function toggleDevice(world: World, deviceId: string, subControl?: number
     device.type === "push_switch_101n" ||
     device.type === "lamp" ||
     device.type === "contactor" ||
-    device.type === "socket"
+    device.type === "socket" ||
+    device.type === "motor_3p"
   ) {
     return;
   }

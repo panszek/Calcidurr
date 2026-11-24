@@ -5,11 +5,14 @@ import { addWire, setPortTight, spawnWago } from "../models/world";
 export function createTestWorld(): World {
   const world = createPrototypeWorld();
   // 5 darab teszt 5-ös WAGO a szimulációs és regressziós tesztekhez
-  spawnWago(world, 5, 700, 635);
-  spawnWago(world, 5, 860, 635);
-  spawnWago(world, 5, 1020, 635);
-  spawnWago(world, 5, 1180, 635);
-  spawnWago(world, 5, 1340, 635);
+  const w1 = spawnWago(world, 5, 700, 635);
+  const w2 = spawnWago(world, 5, 860, 635);
+  const w3 = spawnWago(world, 5, 1020, 635);
+  const w4 = spawnWago(world, 5, 1180, 635);
+  const w5 = spawnWago(world, 5, 1340, 635);
+  // Előre helyezzük a teszt WAGO-kat, hogy a meglévő regressziós tesztek indexelése (world.wagos[0..4]) stabil maradjon
+  const testWagos = [w1, w2, w3, w4, w5];
+  world.wagos = [...testWagos, ...world.wagos.filter((w) => !testWagos.includes(w))];
   return world;
 }
 

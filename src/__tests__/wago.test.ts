@@ -15,9 +15,10 @@ import {
 import { connectNodes, connectPorts, enableSupply, portOf } from "./testHelpers";
 
 describe("Wago system (Thread 2: 3-as and 5-ös Wago, Boxes, Spawning & Removal)", () => {
-  it("starts prototype world with a clean wall (wagos: [])", () => {
+  it("starts prototype world with a clean wall (only the 6+1 fixed motor WAGOs, 0 free WAGOs)", () => {
     const world = createPrototypeWorld();
-    expect(world.wagos).toHaveLength(0);
+    expect(world.wagos.filter((w) => !w.fixed)).toHaveLength(0);
+    expect(world.wagos.filter((w) => w.fixed)).toHaveLength(7);
   });
 
   it("spawns a 3-as WAGO (221-413) with open levers and registered nodes/ports", () => {

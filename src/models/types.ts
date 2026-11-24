@@ -30,7 +30,8 @@ export type DeviceType =
   | "timer_relay"
   | "motion_sensor"
   | "socket"
-  | "lamp";
+  | "lamp"
+  | "motor_3p";
 
 export type ColorMark =
   | "black"
@@ -146,4 +147,19 @@ export interface SimState {
   activeDevices: Set<string>;
   looseCount: number;
   warnings: string[];
+  motor?: MotorState;
+}
+
+export type MotorMode = "off" | "star" | "delta" | "phase_fault";
+export type MotorDirection = "cw" | "ccw" | "none";
+
+export interface MotorState {
+  mode: MotorMode;
+  direction: MotorDirection;
+  speed: number;
+  peConnected: boolean;
+  uPhase: Potential;
+  vPhase: Potential;
+  wPhase: Potential;
+  current: number;
 }
