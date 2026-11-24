@@ -6,6 +6,7 @@ import {
   hitColumnUpperHalf,
   hitDevice,
   hitLegendPoster,
+  hitProbeTarget,
   hitRcdTestButton,
   hitScrewdriverTarget,
   hitWago,
@@ -13,8 +14,10 @@ import {
   hitWagoLever,
   hitWagoRotateButton,
   hitWire,
+  hitWorkbenchTester,
   nearestPort,
   sampleDraft,
+  syncProbeTarget,
   type DraftWire,
 } from "./canvas/input";
 import { LegendTableViewer } from "./canvas/legendTable";
@@ -22,8 +25,19 @@ import { ColorCheckPanel } from "./canvas/colorCheckPanel";
 import { WIRE_COLORS } from "./data/colors";
 import { createPrototypeWorld } from "./data/prototypeTrack";
 import { checkWireColors } from "./engine/colorCheck";
+import { measureUniT } from "./engine/measurements";
 import { portPotential, simulate } from "./engine/simulation";
-import type { Port, SimState, ToolMode, WireColorId, World } from "./models/types";
+import type {
+  Point,
+  Port,
+  ProbeTarget,
+  SimState,
+  TesterReading,
+  ToolMode,
+  WireColorId,
+  World,
+} from "./models/types";
+import { InstrumentPanel } from "./ui/instrumentPanel";
 import {
   addWire,
   hasWagoWires,
@@ -97,8 +111,55 @@ const colorCheckPanel = new ColorCheckPanel({
   },
 });
 
+// UNI-T feszültség- és folytonosságvizsgáló állapot
+let blackProbe: ProbeTarget | undefined;
+let redProbe: ProbeTarget | undefined;
+let hoverProbeTarget: ProbeTarget | undefined;
+let pointerWorldPos: Point | undefined;
+let testerReading: TesterReading = measureUniT(world, sim);
+
+function clearProbes() {
+  blackProbe = undefined;
+  redProbe = undefined;
+  updateTester();
+}
+
+const instrumentPanel = new InstrumentPanel({
+  onClearProbes: () => {
+    clearProbes();
+    draw();
+  },
+  onClose: () => {
+    blackProbe = undefined;
+    redProbe = undefined;
+    if (tool === "tester") {
+      tool = "hand";
+      paintToolbar();
+    }
+    updateTester();
+    draw();
+  },
+});
+
+function updateTester() {
+  blackProbe = syncProbeTarget(world, blackProbe);
+  redProbe = syncProbeTarget(world, redProbe);
+  const liveRedTarget = !redProbe && tool === "tester" && blackProbe ? hoverProbeTarget : undefined;
+  const effectiveRedNodeId = redProbe?.nodeId ?? liveRedTarget?.nodeId;
+  testerReading = measureUniT(world, sim, blackProbe?.nodeId, effectiveRedNodeId);
+  instrumentPanel.update({
+    reading: testerReading,
+    blackProbe,
+    redProbe,
+    liveRedTarget,
+    toolActive: tool === "tester",
+  });
+}
+
 // Panning state
 let isPanning = false;
+let panMoved = false;
+let liftProbesOnClickUp = false;
 let panStart = { clientX: 0, clientY: 0, ox: 0, oy: 0 };
 let spacePressed = false;
 
@@ -117,6 +178,7 @@ function runSim() {
   if (colorCheckActive) {
     colorCheckPanel.update(colorCheckResult);
   }
+  updateTester();
   if (sim.shortCircuit) {
     showToast(sim.warnings[0] ?? "Zárlat keletkezett! A kismegszakító leoldott.");
   }
@@ -174,6 +236,7 @@ function paintToolbar() {
     { id: "screwdriver", label: "Csavarhúzó" },
     { id: "hand", label: "Kéz / ujj" },
     { id: "cutter", label: "Csípőfogó" },
+    { id: "tester", label: "⚡ UNI-T vizsgáló" },
   ];
 
   const colorButtons = (Object.keys(WIRE_COLORS) as WireColorId[])
@@ -268,6 +331,11 @@ function draw() {
     colorCheckActive,
     invalidWireIds: new Set(colorCheckResult.issues.map((i) => i.wireId)),
     colorCheckSummary: colorCheckResult.summary,
+    blackProbe,
+    redProbe,
+    hoverProbeTarget,
+    pointerWorldPos,
+    testerReading,
   });
 }
 
@@ -284,8 +352,19 @@ canvas.addEventListener(
 
 canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
+  if (panMoved) return;
+
+  // Jobb klikk elemeli a mérőtüskéket (különösen UNI-T vizsgáló módban, vagy ha nem WAGO forgatás történik)
   const p = eventPoint(e);
-  const w = hitWago(world, p);
+  const w = tool !== "tester" ? hitWago(world, p) : undefined;
+  if (!w && (blackProbe || redProbe)) {
+    clearProbes();
+    draw();
+    return;
+  }
+  if (tool === "tester") {
+    return;
+  }
   if (w) {
     if (w.fixed) {
       showToast("A motor WAGO-ja rögzített, nem forgatható!");
@@ -311,6 +390,8 @@ canvas.addEventListener("pointerdown", (event) => {
   // Right-click or middle-click or space+click starts panning
   if (event.button === 2 || event.button === 1 || spacePressed) {
     isPanning = true;
+    panMoved = false;
+    liftProbesOnClickUp = false;
     panStart = {
       clientX: event.clientX,
       clientY: event.clientY,
@@ -322,10 +403,53 @@ canvas.addEventListener("pointerdown", (event) => {
   }
 
   const p = eventPoint(event);
+  pointerWorldPos = p;
 
   // Magyarázó plakátra való kattintás az oktatófalon
   if (hitLegendPoster(p)) {
     legendViewer.open();
+    return;
+  }
+
+  // Munkapadon lévő UNI-T műszerre kattintás aktiválja a vizsgáló módot
+  if (hitWorkbenchTester(p)) {
+    tool = "tester";
+    instrumentPanel.show();
+    updateTester();
+    paintToolbar();
+    draw();
+    return;
+  }
+
+  // UNI-T feszültség- és folytonosságvizsgáló mód kezelése
+  if (tool === "tester") {
+    const target = hitProbeTarget(world, p);
+    if (target) {
+      if (!blackProbe || (blackProbe && redProbe)) {
+        // 1. kattintás (vagy mindkét rögzített tüske után új mérés indítása): fekete (COM / -) tüske lerakása
+        blackProbe = target;
+        redProbe = undefined;
+      } else {
+        // 2. kattintás: piros (+) tüske rögzítése
+        redProbe = target;
+      }
+      hoverProbeTarget = target;
+      updateTester();
+      draw();
+      return;
+    }
+
+    // Üres helyre kattintás: húzás esetén vászonmozgatás (pan), sima kattintásnál tüskék elemelése
+    isPanning = true;
+    panMoved = false;
+    liftProbesOnClickUp = !!(blackProbe || redProbe);
+    panStart = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      ox: view.ox,
+      oy: view.oy,
+    };
+    canvas.style.cursor = "grabbing";
     return;
   }
 
@@ -588,13 +712,19 @@ canvas.addEventListener("pointerdown", (event) => {
 
 canvas.addEventListener("pointermove", (event) => {
   if (isPanning) {
-    view.ox = panStart.ox + (event.clientX - panStart.clientX);
-    view.oy = panStart.oy + (event.clientY - panStart.clientY);
+    const dx = event.clientX - panStart.clientX;
+    const dy = event.clientY - panStart.clientY;
+    if (Math.hypot(dx, dy) > 5) {
+      panMoved = true;
+    }
+    view.ox = panStart.ox + dx;
+    view.oy = panStart.oy + dy;
     draw();
     return;
   }
 
   const p = eventPoint(event);
+  pointerWorldPos = p;
 
   if (draggedWago) {
     const distFromStart = Math.hypot(p.x - draggedWago.startX, p.y - draggedWago.startY);
@@ -624,6 +754,19 @@ canvas.addEventListener("pointermove", (event) => {
 
   hoveredWagoBoxSlots = hitWagoBox(p)?.slots;
 
+  if (tool === "tester") {
+    hoverProbeTarget = hitProbeTarget(world, p);
+    hoverPortId = hoverProbeTarget?.portId;
+    hoverWireId = undefined;
+    hoveredWagoId = undefined;
+    updateTester();
+    canvas.style.cursor =
+      hitLegendPoster(p) || hoverProbeTarget ? "pointer" : cursorFor(tool, isPanning);
+    draw();
+    return;
+  }
+
+  hoverProbeTarget = undefined;
   hoverPortId = (tool === "screwdriver" ? hitScrewdriverTarget(world, p) : nearestPort(world, p))?.id;
   if (!hoverPortId && tool === "wire") {
     const lowerCol = hitColumnLowerHalf(world, p);
@@ -633,7 +776,7 @@ canvas.addEventListener("pointermove", (event) => {
   const hoveredWago = hitWago(world, p);
   hoveredWagoId = hoveredWago?.id;
 
-  if (hitLegendPoster(p) || hitWagoRotateButton(world, p)) {
+  if (hitLegendPoster(p) || hitWagoRotateButton(world, p) || hitWorkbenchTester(p)) {
     canvas.style.cursor = "pointer";
   } else if (tool === "hand") {
     if (hitWagoLever(world, p)) {
@@ -700,8 +843,14 @@ canvas.addEventListener("pointerup", (event) => {
   const p = eventPoint(event);
 
   if (isPanning) {
+    const shouldLiftProbes = liftProbesOnClickUp && !panMoved;
     isPanning = false;
+    liftProbesOnClickUp = false;
     canvas.style.cursor = cursorFor(tool);
+    if (shouldLiftProbes) {
+      clearProbes();
+      draw();
+    }
   }
 
   if (draggedWago) {
@@ -752,19 +901,32 @@ canvas.addEventListener("pointerup", (event) => {
 canvas.addEventListener("pointerleave", () => {
   if (isPanning) {
     isPanning = false;
+    liftProbesOnClickUp = false;
   }
   if (draggedWago) {
     draggedWago = undefined;
     pendingLeverPort = undefined;
   }
+  pointerWorldPos = undefined;
+  hoverProbeTarget = undefined;
   hoverPortId = undefined;
   hoverWireId = undefined;
   hoveredWagoId = undefined;
+  if (tool === "tester" && blackProbe && !redProbe) {
+    updateTester();
+  }
   draw();
 });
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") spacePressed = true;
+  if (e.key === "Escape") {
+    if (blackProbe || redProbe) {
+      clearProbes();
+      draw();
+      return;
+    }
+  }
   if (e.key === "r" || e.key === "R") {
     const targetWagoId = draggedWago?.id ?? hoveredWagoId;
     if (targetWagoId) {
@@ -798,7 +960,14 @@ toolbar.addEventListener("click", (event) => {
   const toolBtn = target.closest<HTMLButtonElement>("[data-tool]");
   if (toolBtn?.dataset.tool) {
     tool = toolBtn.dataset.tool as ToolMode;
+    if (tool === "tester") {
+      instrumentPanel.show();
+    } else if (!blackProbe && !redProbe) {
+      instrumentPanel.hide();
+    }
+    updateTester();
     paintToolbar();
+    draw();
     return;
   }
 
@@ -852,6 +1021,12 @@ toolbar.addEventListener("click", (event) => {
     pendingLeverPort = undefined;
     hoveredWagoId = undefined;
     hoveredWagoBoxSlots = undefined;
+    blackProbe = undefined;
+    redProbe = undefined;
+    hoverProbeTarget = undefined;
+    if (tool !== "tester") {
+      instrumentPanel.hide();
+    }
     colorCheckActive = false;
     colorCheckPanel.hide();
     runSim();
@@ -865,7 +1040,12 @@ toolbar.addEventListener("change", (event) => {
   if (input.name === "color") {
     wireColor = input.value as WireColorId;
     tool = "wire";
+    if (!blackProbe && !redProbe) {
+      instrumentPanel.hide();
+    }
+    updateTester();
     paintToolbar();
+    draw();
   }
 });
 
@@ -922,5 +1102,5 @@ draw();
 
 Object.defineProperty(window, "__simApp", {
   configurable: true,
-  get: () => ({ world, sim, tool, debug }),
+  get: () => ({ world, sim, tool, debug, blackProbe, redProbe, testerReading }),
 });

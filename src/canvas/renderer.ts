@@ -1,9 +1,20 @@
 import { MARK_FILL, WIRE_COLORS } from "../data/colors";
 import { UPPER_TERMINAL_GROUPS, LOWER_TERMINAL_GROUPS } from "../data/terminalLegend";
 import { WAGO_BOXES } from "../data/wagoBoxes";
+import { WORKBENCH_TESTER_BOUNDS } from "./input";
 import { isWireLive } from "../engine/simulation";
 import { hasWagoWires, isWireEndSecure } from "../models/world";
-import type { Device, Point, Port, SimState, TerminalColumn, ToolMode, World } from "../models/types";
+import type {
+  Device,
+  Point,
+  Port,
+  ProbeTarget,
+  SimState,
+  TerminalColumn,
+  TesterReading,
+  ToolMode,
+  World,
+} from "../models/types";
 
 export interface RenderExtras {
   debug: boolean;
@@ -20,6 +31,11 @@ export interface RenderExtras {
   colorCheckActive?: boolean;
   invalidWireIds?: Set<string>;
   colorCheckSummary?: string;
+  blackProbe?: ProbeTarget;
+  redProbe?: ProbeTarget;
+  hoverProbeTarget?: ProbeTarget;
+  pointerWorldPos?: Point;
+  testerReading?: TesterReading;
 }
 
 function roundRect(
@@ -419,25 +435,7 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(-10, -22, 20, 22);
   ctx.restore();
 
-  // Multimeter on the desk
-  roundRect(ctx, 750, by + 25, 75, 110, 8);
-  ctx.fillStyle = "#dc2626";
-  ctx.fill();
-  ctx.strokeStyle = "#991b1b";
-  ctx.stroke();
-  // Screen
-  roundRect(ctx, 760, by + 35, 55, 24, 3);
-  ctx.fillStyle = "#a3e635";
-  ctx.fill();
-  ctx.fillStyle = "#166534";
-  ctx.font = "800 11px monospace";
-  ctx.fillText("230.4 V", 764, by + 52);
-  // Dial
-  ctx.beginPath();
-  ctx.arc(787, by + 82, 16, 0, Math.PI * 2);
-  ctx.fillStyle = "#1f2937";
-  ctx.fill();
-
+  // UNI-T UT18D műszer helye a munkapadon (részletes rajzolat külön függvényben)
   ctx.restore();
 
   // 4. Motor WAGO kábelköteg a poszter alatt (y = 940) és leállás a motorkapocsházhoz (y = 1122)
@@ -1738,6 +1736,25 @@ function drawDevices(ctx: CanvasRenderingContext2D, world: World, sim: SimState,
       ctx.fillRect(x + w / 2 - 3, y + 14, 6, 5);
       ctx.fillRect(x + w / 2 - 3, y + 53, 6, 5);
 
+      // UNI-T vizsgáló módban finom mérőpont-segédgyűrűk a dugalj furatain és PE rugóin
+      if (extras?.tool === "tester") {
+        ctx.save();
+        ctx.strokeStyle = "rgba(14, 165, 233, 0.75)";
+        ctx.lineWidth = 1.3;
+        ctx.setLineDash([2, 2]);
+        for (const pt of [
+          { px: x + w / 2 - 9, py: y + 36 },
+          { px: x + w / 2 + 9, py: y + 36 },
+          { px: x + w / 2, py: y + 16.5 },
+          { px: x + w / 2, py: y + 55.5 },
+        ]) {
+          ctx.beginPath();
+          ctx.arc(pt.px, pt.py, 5.5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
       const active = sim.activeDevices.has(device.id);
       ctx.fillStyle = active ? "#16a34a" : "#64748b";
       ctx.font = "800 9px Segoe UI";
@@ -1885,6 +1902,280 @@ function drawLooseHint(ctx: CanvasRenderingContext2D, point: Point) {
   ctx.stroke();
 }
 
+function drawWorkbenchTester(ctx: CanvasRenderingContext2D, extras: RenderExtras) {
+  const b = WORKBENCH_TESTER_BOUNDS;
+  const reading = extras.testerReading;
+  const isTesterActive = extras.tool === "tester";
+
+  ctx.save();
+
+  // Árnyék az asztallapon
+  ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 4;
+
+  // Piros ipari UNI-T védőburkolat
+  roundRect(ctx, b.x, b.y, b.w, b.h, 11);
+  ctx.fillStyle = "#dc2626";
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.strokeStyle = isTesterActive ? "#38bdf8" : "#991b1b";
+  ctx.lineWidth = isTesterActive ? 2.5 : 1.5;
+  ctx.stroke();
+
+  if (isTesterActive) {
+    ctx.save();
+    roundRect(ctx, b.x - 4, b.y - 4, b.w + 8, b.h + 8, 14);
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.7)";
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([5, 3]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Belső antracit előlap
+  roundRect(ctx, b.x + 6, b.y + 8, b.w - 12, b.h - 20, 7);
+  ctx.fillStyle = "#181d27";
+  ctx.fill();
+  ctx.strokeStyle = "#0f172a";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // UNI-T felirat
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "900 8.5px Segoe UI, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("UNI-T UT18D", b.x + b.w / 2, b.y + 20);
+
+  // Mini LED sáv (12..400V + Rx + ⚡)
+  const steps = [400, 230, 120, 50, 24, 12] as const;
+  const activeSet = new Set(reading?.ledSteps ?? []);
+  steps.forEach((step, idx) => {
+    const ly = b.y + 28 + idx * 7;
+    const on = activeSet.has(step);
+    ctx.beginPath();
+    ctx.arc(b.x + 18, ly, 2.3, 0, Math.PI * 2);
+    ctx.fillStyle = on ? (step >= 120 ? "#ef4444" : "#facc15") : "#334155";
+    ctx.fill();
+    ctx.fillStyle = on ? "#e2e8f0" : "#64748b";
+    ctx.font = "700 6px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText(`${step}`, b.x + 23, ly + 2);
+  });
+
+  // Folytonosság (Rx) és Fázis (⚡) mini LED-ek a jobb oldalon
+  ctx.beginPath();
+  ctx.arc(b.x + 56, b.y + 34, 2.8, 0, Math.PI * 2);
+  ctx.fillStyle = reading?.singlePolePhase ? "#ef4444" : "#334155";
+  ctx.fill();
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "700 6.5px Segoe UI";
+  ctx.fillText("⚡", b.x + 62, b.y + 36.5);
+
+  ctx.beginPath();
+  ctx.arc(b.x + 56, b.y + 50, 2.8, 0, Math.PI * 2);
+  ctx.fillStyle = reading?.continuity ? "#10b981" : "#334155";
+  ctx.fill();
+  ctx.fillStyle = "#94a3b8";
+  ctx.fillText("Rx", b.x + 62, b.y + 52.5);
+
+  // Háttérvilágításos LCD ablak
+  const lcdX = b.x + 11;
+  const lcdY = b.y + 74;
+  const lcdW = b.w - 22;
+  const lcdH = 26;
+  const danger = (reading?.voltage ?? 0) >= 50 || !!reading?.singlePolePhase;
+  roundRect(ctx, lcdX, lcdY, lcdW, lcdH, 3);
+  ctx.fillStyle = danger ? "#fdba74" : reading?.continuity ? "#86efac" : "#a7c7a7";
+  ctx.fill();
+  ctx.strokeStyle = "#090d14";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = danger ? "#431407" : "#0b1f13";
+  ctx.font = "900 11px monospace";
+  ctx.textAlign = "right";
+  ctx.fillText(reading?.lcdPrimary ?? "---", lcdX + lcdW - 4, lcdY + 17);
+
+  // Alsó COM (-) és (+) mérőzsinór kivezető hüvelyek
+  ctx.fillStyle = "#111827";
+  ctx.beginPath();
+  ctx.arc(b.x + 26, b.y + b.h - 6, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#b91c1c";
+  ctx.beginPath();
+  ctx.arc(b.x + b.w - 26, b.y + b.h - 6, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawSingleProbe(
+  ctx: CanvasRenderingContext2D,
+  tip: Point,
+  polarity: "black" | "red",
+  pinned: boolean,
+  snapped: boolean,
+) {
+  const b = WORKBENCH_TESTER_BOUNDS;
+  const jackX = polarity === "black" ? b.x + 26 : b.x + b.w - 26;
+  const jackY = b.y + b.h - 4;
+
+  // V-alakú döntés lefelé, hogy két szomszédos sorkapcson vagy közös ponton se fedjék egymást
+  const tiltRad = polarity === "black" ? Math.PI * 0.63 : Math.PI * 0.37;
+  const dirX = Math.cos(tiltRad);
+  const dirY = Math.sin(tiltRad);
+
+  const tailDist = 76;
+  const tailX = tip.x + dirX * tailDist;
+  const tailY = tip.y + dirY * tailDist;
+
+  ctx.save();
+  ctx.globalAlpha = pinned || snapped ? 1 : 0.82;
+
+  // 1. Hajlékony szilikon mérőzsinór a munkapadi UNI-T műszertől a tüske végéig
+  const sag = Math.max(50, Math.min(220, Math.abs(jackY - tailY) * 0.35 + 45));
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(jackX, jackY);
+  ctx.bezierCurveTo(
+    jackX + (polarity === "black" ? -35 : 35),
+    jackY - sag * 0.45,
+    tailX + dirX * 45,
+    tailY + sag * 0.55,
+    tailX,
+    tailY,
+  );
+  ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+  ctx.shadowBlur = 5;
+  ctx.shadowOffsetY = 2;
+  ctx.lineWidth = 4.2;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = polarity === "black" ? "#18181b" : "#dc2626";
+  ctx.stroke();
+
+  // Finom fénycsík a mérőzsinóron
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 1.1;
+  ctx.strokeStyle = polarity === "black" ? "rgba(255,255,255,0.22)" : "rgba(254,202,202,0.4)";
+  ctx.stroke();
+  ctx.restore();
+
+  // 2. Érintkezési gyűrű a mérési ponton
+  if (pinned || snapped) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(tip.x, tip.y, pinned ? 7.5 : 8.5, 0, Math.PI * 2);
+    ctx.strokeStyle = polarity === "black" ? "#38bdf8" : "#facc15";
+    ctx.lineWidth = pinned ? 2.2 : 1.8;
+    if (!pinned) ctx.setLineDash([3, 2]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 3. VDE szigetelt mérőtüske test kirajzolása
+  ctx.save();
+  ctx.translate(tip.x, tip.y);
+  ctx.rotate(tiltRad);
+
+  // Fémes mérőhegy (0..16 px)
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(16, -2.2);
+  ctx.lineTo(16, 2.2);
+  ctx.closePath();
+  ctx.fillStyle = "#e2e8f0";
+  ctx.fill();
+  ctx.strokeStyle = "#475569";
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
+
+  // VDE ujjvédő gallér (16..21 px)
+  roundRect(ctx, 15, -7.5, 5.5, 15, 2);
+  ctx.fillStyle = polarity === "black" ? "#27272a" : "#ef4444";
+  ctx.fill();
+  ctx.strokeStyle = "#0f172a";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Markolat (20..66 px)
+  roundRect(ctx, 20, -5.2, 46, 10.4, 3.5);
+  ctx.fillStyle = polarity === "black" ? "#1f2937" : "#dc2626";
+  ctx.fill();
+  ctx.strokeStyle = polarity === "black" ? "#4b5563" : "#7f1d1d";
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+
+  // Bordázott csúszásgátló csíkok a markolaton
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+  ctx.lineWidth = 1.2;
+  for (let gx = 28; gx <= 40; gx += 4) {
+    ctx.beginPath();
+    ctx.moveTo(gx, -4);
+    ctx.lineTo(gx, 4);
+    ctx.stroke();
+  }
+
+  // Kábel-törésgátló nyak (66..76 px)
+  roundRect(ctx, 65, -3.2, 11, 6.4, 2);
+  ctx.fillStyle = polarity === "black" ? "#09090b" : "#991b1b";
+  ctx.fill();
+
+  ctx.restore();
+
+  // 4. Polaritás jelvény a markolat mellett (- / +)
+  const badgeX = tip.x + dirX * 50;
+  const badgeY = tip.y + dirY * 50;
+  ctx.beginPath();
+  ctx.arc(badgeX, badgeY, 7.5, 0, Math.PI * 2);
+  ctx.fillStyle = polarity === "black" ? "#0f172a" : "#991b1b";
+  ctx.fill();
+  ctx.strokeStyle = pinned ? "#facc15" : "#e2e8f0";
+  ctx.lineWidth = pinned ? 1.8 : 1.1;
+  ctx.stroke();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "900 10px Segoe UI, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(polarity === "black" ? "−" : "+", badgeX, badgeY + 0.5);
+
+  ctx.restore();
+}
+
+function drawTesterProbes(ctx: CanvasRenderingContext2D, extras: RenderExtras) {
+  // Célpont előnézeti kiemelés UNI-T módban
+  if (extras.tool === "tester" && extras.hoverProbeTarget) {
+    const ht = extras.hoverProbeTarget;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(ht.x, ht.y, 10.5, 0, Math.PI * 2);
+    ctx.strokeStyle = extras.blackProbe ? "#ef4444" : "#38bdf8";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 1. Fekete (COM / -) tüske: rögzítve vagy (ha még nincs lerakva) kurzor-előnézetként a célponton
+  if (extras.blackProbe) {
+    drawSingleProbe(ctx, extras.blackProbe, "black", true, true);
+  } else if (extras.tool === "tester" && extras.hoverProbeTarget) {
+    drawSingleProbe(ctx, extras.hoverProbeTarget, "black", false, true);
+  }
+
+  // 2. Piros (+) tüske: rögzítve, vagy élő mérésként a kurzort / célpontot követve
+  if (extras.redProbe) {
+    drawSingleProbe(ctx, extras.redProbe, "red", true, true);
+  } else if (extras.tool === "tester" && extras.blackProbe) {
+    const liveTip = extras.hoverProbeTarget ?? extras.pointerWorldPos;
+    if (liveTip) {
+      drawSingleProbe(ctx, liveTip, "red", false, !!extras.hoverProbeTarget);
+    }
+  }
+}
+
 export function renderWorld(
   ctx: CanvasRenderingContext2D,
   world: World,
@@ -1904,8 +2195,9 @@ export function renderWorld(
     }
   }
 
-  // Draw WAGO dispenser boxes on the workbench
+  // Draw WAGO dispenser boxes and UNI-T tester on the workbench
   drawWagoBoxes(ctx, world, extras);
+  drawWorkbenchTester(ctx, extras);
 
   for (const wago of world.wagos) {
     drawWago(ctx, world, wago, extras.hoverPortId, extras.hoverWagoId, extras.draggedWagoId);
@@ -1986,6 +2278,9 @@ export function renderWorld(
       strokePolyline(ctx, extras.draft.points, 5.2, strokeCol, false);
     }
   }
+
+  // UNI-T mérőtüskék és mérőzsinórok
+  drawTesterProbes(ctx, extras);
 
   // Debug overlay
   if (extras.debug) {

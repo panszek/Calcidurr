@@ -2,7 +2,7 @@ export type Potential = "none" | "L1" | "L2" | "L3" | "N" | "PE";
 
 export type WireColorId = "L1" | "L2" | "L3" | "N" | "PE" | "CTRL";
 
-export type ToolMode = "wire" | "screwdriver" | "hand" | "cutter";
+export type ToolMode = "wire" | "screwdriver" | "hand" | "cutter" | "tester";
 
 export type PortKind = "screw" | "wago";
 
@@ -184,4 +184,53 @@ export interface ColorCheckResult {
   issues: WireColorIssue[];
   summary: string;
 }
+
+export type PhaseRotation = "R" | "L" | "none";
+
+export type VoltageLedStep = 12 | 24 | 50 | 120 | 230 | 400;
+
+export type ProbeTargetKind = "screw_top" | "screw_bottom" | "port" | "wago" | "socket";
+
+export interface ProbeTarget {
+  id: string;
+  nodeId: string;
+  portId?: string;
+  kind: ProbeTargetKind;
+  x: number;
+  y: number;
+  /** Információelrejtést tisztelő fizikai megnevezés a műszerpanelen */
+  displayLabel: string;
+}
+
+export interface TesterReading {
+  /** Mindkét mérőtüske mérési ponton van-e */
+  active: boolean;
+  /** Legalább az egyik mérőtüske le van-e téve */
+  hasAnyProbe: boolean;
+  /** Mért váltakozó feszültség (0, 230 vagy 400 V) */
+  voltage: number;
+  /** Igaz, ha a mért feszültség >= 12 V AC */
+  isAcVoltage: boolean;
+  /** Világító feszültség-lépcső LED-ek (12V, 24V, 50V, 120V, 230V, 400V) */
+  ledSteps: VoltageLedStep[];
+  /** Egypólusú fázisjelzés (⚡ LED), ha bármelyik tüske élő fázison (L1/L2/L3) van */
+  singlePolePhase: boolean;
+  /** Fázissorrend jelzés 400 V-os vonali mérésnél ("R" jobbra, "L" balra) */
+  phaseRotation: PhaseRotation;
+  /** Folytonosságvizsgálat aktív-e (mindkét tüske feszültségmentes ponton van) */
+  continuityActive: boolean;
+  /** Folytonos fémes kapcsolat áll-e fenn (0.0 Ω + 🔊 Rx LED + sípolás) */
+  continuity: boolean;
+  /** Ellenállás / folytonosság kijelzés ("0.0 Ω" vagy "OL", feszültség alatt null) */
+  resistanceText: "0.0 Ω" | "OL" | null;
+  /** Elsődleges LCD kijelzés ("230 V", "400 V", "0 V", "0.0 Ω", "OL", "---") */
+  lcdPrimary: string;
+  /** Másodlagos LCD státuszsor */
+  lcdSecondary: string;
+  /** Fekete (COM / -) tüske potenciálja */
+  blackPotential: Potential;
+  /** Piros (+) tüske potenciálja */
+  redPotential: Potential;
+}
+
 

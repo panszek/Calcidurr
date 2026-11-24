@@ -27,6 +27,20 @@ function coilEnergized(potential: Record<string, Potential>, a1Id: string, a2Id:
   return hasPhase && hasN;
 }
 
+export function buildConductiveGraph(
+  world: World,
+  energizedContactors?: Set<string>,
+): Map<string, string[]> {
+  const activeContactors =
+    energizedContactors ??
+    new Set(
+      world.devices
+        .filter((d) => d.type === "contactor" && d.energized)
+        .map((d) => d.id),
+    );
+  return neighborsOf(world, activeContactors);
+}
+
 function neighborsOf(world: World, energizedContactors: Set<string>): Map<string, string[]> {
   const adj = new Map<string, string[]>();
   const link = (a?: string, b?: string) => {
@@ -368,7 +382,7 @@ function propagate(
   };
 }
 
-function areNodesConnected(adj: Map<string, string[]>, startId: string, targetId: string): boolean {
+export function areNodesConnected(adj: Map<string, string[]>, startId: string, targetId: string): boolean {
   if (startId === targetId) return true;
   const visited = new Set<string>();
   const queue = [startId];

@@ -12,6 +12,7 @@ Legyen egy eszköztár a következő módokkal:
   - Wago összekötők narancssárga karjának fel- és lehajtása (`isLeverClosed` váltása). A vezeték csak akkor csatlakozik, ha a kar lehajtott állapotban van.
   - Kapcsolók, nyomógombok és kismegszakítók működtetése (nyomás/billentés).
 - **Csípőfogó eszköz:** Vezeték törlése (csak akkor engedélyezett, ha a vezeték mindkét végén ki van lazítva a csavar / nyitva van a Wago).
+- **UNI-T vizsgáló eszköz (`⚡ UNI-T vizsgáló`):** Kétpólusú feszültség-, fázissorrend- és folytonosságvizsgáló (UNI-T UT18D mintára) fekete (`COM / −`) és piros (`+`) mérőtüskékkel, lebegő digitális/LED műszerpanellel és némítható Web Audio API sípoló hangjelzéssel.
 
 ## 2. Információelrejtés és Hibakereső (Debug) mód
 - **Normál mód (alapértelmezett):** A sorkapcsok fölé víve az egeret **NEM jelenik meg semmilyen súgószöveg**! A felhasználónak csak a sorkapocs számozása és az alatta lévő gyári színkód-négyzetek (fekete, kék, zöld-sárga, piros) segítenek.
@@ -42,17 +43,23 @@ A kód a következő modulokra oszlik (Vite + TypeScript, böngészőben Canvas)
 - `src/models/` — domain típusok és a világ (pálya) állapota.
   - `types.ts` — `Potential`, `ToolMode`, `Port`, `Wire`, `Device`, `World`.
   - `world.ts` — mutációk: vezeték létrehozása/törlése, csavar, kar, készülékállapot.
-- `src/engine/` — szimuláció, UI nélkül.
-  - `simulation.ts` — gráfépítés, BFS potenciálterjesztés, zárlat, fogyasztók, MK iteráció.
+- `src/engine/` — szimuláció és mérőlogika, UI nélkül.
+  - `simulation.ts` — gráfépítés, BFS potenciálterjesztés, zárlat, fogyasztók, MK iteráció, 3F motor.
+  - `colorCheck.ts` — szabványos kábelszín validáció (Fekete / Kék / Zöld-sárga).
+  - `measurements.ts` — UNI-T kétpólusú feszültségmérés (`230V` / `400V` / `0V`), fázissorrend (`R`/`L`), egypólusú fázisjelzés és BFS folytonosságvizsgálat (`0.0 Ω` / `OL`).
+- `src/ui/` — lebegő műszerfalak és vezérlőpanelek.
+  - `instrumentPanel.ts` — mozgatható lebegő UNI-T UT18D műszerpanel + Web Audio API piezo folytonossági hangjelző.
 - `src/canvas/` — megjelenítés és egérkezelés.
-  - `renderer.ts` — sorkapocs, Wago, készülékek, vezeték, debug overlay.
-  - `input.ts` — mágneses tapadás, szabadkézi vonal, eszközök hittestje.
+  - `renderer.ts` — sorkapocs, Wago, készülékek, 3F motor, vezeték, UNI-T mérőtüskék/mérőzsinórok, debug overlay.
+  - `input.ts` — mágneses tapadás, szabadkézi vonal, eszközök és mérőtüskék hittestje.
+  - `legendTable.ts`, `colorCheckPanel.ts` — sorkapocs-kiosztási táblázat és színhiba-panel.
 - `src/data/` — pályaadatok.
   - `colors.ts` — vezeték- és jelölőszínek.
-  - `prototypeTrack.ts` — az MVP tesztpálya koordinátái és csomópontjai.
+  - `prototypeTrack.ts` — az oktatófal koordinátái és csomópontjai.
+  - `terminalLegend.ts`, `wagoBoxes.ts` — jegyzékcsoportok és munkapadi WAGO dobozok.
 - `src/__tests__/` — Vitest automatizált unit és szimulációs regressziós tesztek (`npm test`).
   - `testHelpers.ts` — újrahasznosítható bekötő és tápkapcsoló segédfüggvények.
-  - `world.test.ts`, `simulation.test.ts`, `input.test.ts`, `prototypeTrack.test.ts`, `wago.test.ts` — világmutációk, áramköri szimuláció, kezdőállapotok, WAGO kezelés és Canvas hit-testek ellenőrzése.
+  - `world.test.ts`, `simulation.test.ts`, `input.test.ts`, `prototypeTrack.test.ts`, `wago.test.ts`, `rcd.test.ts`, `motor.test.ts`, `colorCheck.test.ts`, `measurements.test.ts` — világmutációk, áramköri szimuláció, ÁVK-k, 3F motor, színellenőrzés, UNI-T mérések és Canvas hit-testek ellenőrzése.
 
 ## 6. Vizuális referenciák
 A `sources/` mappa a valós oktatófalat dokumentálja:
@@ -198,3 +205,17 @@ A prototípus validációja és a valós fotó (`sources/sorkapocs_kiosztas.png`
   - **Fázishiba (`phase_fault`):** 1 fázis kiesése/lekötése esetén a motor nem forog (`speed: 0`), megnövekedett áramfelvétel (`8.5 A`), rezgés és figyelmeztetés.
   - **PE földelés felügyelet:** Földelés nélküli motorüzem esetén figyelmeztetés.
   - **Zárlatvédelem:** Csillag és Delta egyidejű hibás bekapcsolásakor (pl. `MK2` és `MK3` egyszerre behúzva) a kismegszakító azonnal leold.
+
+### 8.8. UNI-T UT18D Feszültség- és Folytonosságvizsgáló Műszer:
+- **Két mérőtüskés működés (`ToolMode = "tester"`):**
+  - Aktiválható a felső eszköztár `⚡ UNI-T vizsgáló` gombjával vagy a munkapadon elhelyezett UNI-T műszerre kattintva.
+  - **1. kattintás:** lerakja a **fekete (`COM / −`)** mérőtüskét bármely mérhető pontra (sorkapocs felső gyári vagy alsó csavarja/nyílása, szabad 3/5-ös WAGO nyílás, a motor 6+1 db fix WAGO-ja, valamint a dugaszolóaljzat `L`, `N` és `PE` érintkezői).
+  - **Élő mérés és 2. kattintás:** az egér mozgatásával a **piros (`+`)** mérőtüske élőben mér a rögzített fekete ponthoz képest; 2. kattintásra a piros tüske is rögzül, így **Kéz** vagy **Csavarhúzó** eszközre átváltva kapcsolgatás közben is élőben követhető a mérés.
+  - **Tüskék elemelése:** jobb egérgomb, `Esc` billentyű, üres helyre kattintás vagy a műszerpanel `⏏ Levétel` gombja.
+  - **Információelrejtés védelme:** gyakorló módban a sorkapcsoknál kizárólag a fizikai sor- és oszlopszám (`X1/..`, `X2/..`) látszik a műszerpanelen, a kapocs rejtett funkciója nem jelenik meg.
+- **Mérési logika:**
+  - **Feszültségmérés:** Fázis (`L1/L2/L3`) ↔ `N` vagy `PE` → **`230 V AC`**; két különböző fázis (`L1–L2`, `L2–L3`, `L3–L1`) → **`400 V AC`** + forgásirány (`R ↻` vagy `L ↺`); azonos potenciál vagy lebegő pontok → **`0 V`**.
+  - **Egypólusú fázisjelzés (`⚡` LED):** világít, amint bármelyik mérőtüske élő fázist (`L1/L2/L3`) érint.
+  - **Folytonosságvizsgálat (`0.0 Ω` / `OL` + sípolás):** kizárólag feszültségmentes pontok között aktív (feszültség alatt nem csipog). Kikapcsolt kismegszakítóknál is ellenőrzi a fémes összeköttetést meghúzott vezetékeken és zárt érintkezőkön át; folytonosságnál `0.0 Ω`, `🔊 Rx` LED és némítható **Web Audio API** sípoló hang jelzi az áramutat.
+- **Lebegő UNI-T UT18D műszerpanel:** szabadon mozgatható (draggable) panel `12V / 24V / 50V / 120V / 230V / 400V` LED sávval, `⚡ FÁZIS`, `~ AC`, `🔊 Rx` és `L / R` LED-ekkel, kétszínű háttérvilágításos LCD kijelzővel, némítás és tüske-levétel vezérlőkkel.
+

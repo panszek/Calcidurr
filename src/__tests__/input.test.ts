@@ -6,15 +6,19 @@ import {
   hitColumnUpperHalf,
   hitDevice,
   hitLegendPoster,
+  hitProbeTarget,
   hitScrewdriverTarget,
   hitWago,
   hitWagoLever,
   hitWire,
+  hitWorkbenchTester,
   nearestPort,
   sampleDraft,
+  syncProbeTarget,
+  WORKBENCH_TESTER_BOUNDS,
 } from "../canvas/input";
 import { SNAP_RADIUS } from "../data/colors";
-import { setPortTight } from "../models/world";
+import { moveWago, removeWago, setPortTight, spawnWago } from "../models/world";
 import { connectNodes, createTestWorld, portOf } from "./testHelpers";
 
 describe("Canvas input hit-testing & geometry", () => {
@@ -116,9 +120,68 @@ describe("Canvas input hit-testing & geometry", () => {
     expect(hitLegendPoster({ x: 100, y: 100 })).toBe(false);
 
     expect(cursorFor("wire", false)).toBe("crosshair");
+    expect(cursorFor("tester", false)).toBe("crosshair");
     expect(cursorFor("screwdriver", false)).toBe("pointer");
     expect(cursorFor("cutter", false)).toBe("not-allowed");
     expect(cursorFor("hand", false)).toBe("grab");
     expect(cursorFor("wire", true)).toBe("grabbing");
+  });
+
+  it("hits UNI-T probe targets on upper/lower terminal screws, WAGOs, motor WAGOs and socket without leaking secret names", () => {
+    const world = createTestWorld();
+    const col0 = world.columns[0];
+    const col1 = world.columns[1];
+    const cx0 = col0.x + col0.w / 2;
+
+    // 1. Sorkapocs felső (gyári) csavar és alsó csavar + szomszédos oszlop elválasztás
+    const topHit = hitProbeTarget(world, { x: cx0, y: col0.y + 19 });
+    expect(topHit?.kind).toBe("screw_top");
+    expect(topHit?.nodeId).toBe(col0.nodeId);
+    expect(topHit?.displayLabel).toContain("X1/1");
+    expect(topHit?.displayLabel).not.toContain("Nullája");
+
+    const botHit = hitProbeTarget(world, { x: cx0, y: col0.y + 92 });
+    expect(botHit?.kind).toBe("screw_bottom");
+    expect(botHit?.nodeId).toBe(col0.nodeId);
+
+    const col1EdgeHit = hitProbeTarget(world, { x: col1.x, y: col1.y + 92 });
+    expect(col1EdgeHit?.nodeId).toBe(col1.nodeId);
+
+    // 2. Motor rögzített WAGO 1. gyári portja is mérhető
+    const motorWago = world.wagos.find((w) => w.id === "wago_motor_u1")!;
+    const p1 = world.ports[motorWago.portIds[0]];
+    const motorHit = hitProbeTarget(world, { x: p1.x, y: p1.y });
+    expect(motorHit?.kind).toBe("wago");
+    expect(motorHit?.nodeId).toBe("motor_u1");
+    expect(motorHit?.displayLabel).toContain("U1");
+
+    // 3. Dugaszolóaljzat L, N és PE érintkezői
+    const socket = world.devices.find((d) => d.id === "dev_socket")!;
+    const scx = socket.bounds.x + socket.bounds.w / 2;
+    expect(hitProbeTarget(world, { x: scx - 9, y: socket.bounds.y + 36 })?.nodeId).toBe("sock_l");
+    expect(hitProbeTarget(world, { x: scx + 9, y: socket.bounds.y + 36 })?.nodeId).toBe("sock_n");
+    expect(hitProbeTarget(world, { x: scx, y: socket.bounds.y + 16.5 })?.nodeId).toBe("sock_pe");
+
+    // 4. Munkapadi UNI-T műszer hit-test és WAGO szinkronizálás
+    expect(
+      hitWorkbenchTester({
+        x: WORKBENCH_TESTER_BOUNDS.x + 20,
+        y: WORKBENCH_TESTER_BOUNDS.y + 30,
+      }),
+    ).toBe(true);
+    expect(hitWorkbenchTester({ x: 100, y: 100 })).toBe(false);
+
+    const freeWago = spawnWago(world, 3, 900, 650);
+    const wPort = world.ports[freeWago.portIds[1]];
+    const wProbe = hitProbeTarget(world, { x: wPort.x, y: wPort.y })!;
+    expect(wProbe.nodeId).toBe(freeWago.nodeId);
+
+    moveWago(world, freeWago.id, 950, 670);
+    const synced = syncProbeTarget(world, wProbe)!;
+    expect(synced.x).toBe(world.ports[freeWago.portIds[1]].x);
+    expect(synced.y).toBe(world.ports[freeWago.portIds[1]].y);
+
+    removeWago(world, freeWago.id);
+    expect(syncProbeTarget(world, synced)).toBeUndefined();
   });
 });
