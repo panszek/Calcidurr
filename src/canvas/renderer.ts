@@ -17,6 +17,9 @@ export interface RenderExtras {
   tooltip?: { x: number; y: number; lines: string[] };
   motorAngle?: number;
   motorVibration?: number;
+  colorCheckActive?: boolean;
+  invalidWireIds?: Set<string>;
+  colorCheckSummary?: string;
 }
 
 function roundRect(
@@ -1913,6 +1916,27 @@ export function renderWorld(
 
   // Wires
   for (const wire of world.wires) {
+    const isColorInvalid = !!(extras.colorCheckActive && extras.invalidWireIds?.has(wire.id));
+
+    // Kábelszín-validációs hiba kiemelése: piros szaggatott keret a vezeték körül
+    if (isColorInvalid && wire.points.length >= 2) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(wire.points[0].x, wire.points[0].y);
+      for (let i = 1; i < wire.points.length; i++) {
+        ctx.lineTo(wire.points[i].x, wire.points[i].y);
+      }
+      ctx.setLineDash([8, 6]);
+      ctx.lineWidth = 11;
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.shadowColor = "rgba(239, 68, 68, 0.85)";
+      ctx.shadowBlur = 9;
+      ctx.stroke();
+      ctx.restore();
+    }
+
     const glow = extras.debug && isWireLive(sim, world, wire.id);
     if (wire.color === "PE") {
       strokePe(ctx, wire.points, glow);
@@ -1925,6 +1949,26 @@ export function renderWorld(
         strokeCol,
         glow,
       );
+    }
+
+    // Színhiba jelző ikon a vezeték felezőpontjánál
+    if (isColorInvalid && wire.points.length >= 2) {
+      const midIdx = Math.floor(wire.points.length / 2);
+      const p = wire.points[midIdx];
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = "#dc2626";
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "800 12px Segoe UI, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("✕", p.x, p.y + 0.5);
+      ctx.restore();
     }
 
     if (!isWireEndSecure(world, wire.startPortId)) drawLooseHint(ctx, wire.points[0]);
@@ -1954,9 +1998,12 @@ export function renderWorld(
     ctx.fillStyle = "#facc15";
     ctx.font = "700 11px Segoe UI";
     ctx.textAlign = "left";
-    const text = sim.warnings.length
+    let text = sim.warnings.length
       ? sim.warnings.join("  •  ")
       : "Rendszer üzemkész: nincs zárlat, nincs laza kötés.";
+    if (extras.colorCheckSummary) {
+      text += `  •  Szín: ${extras.colorCheckSummary}`;
+    }
     ctx.fillText(`DEBUG: ${text}`, 80, 747);
   }
 

@@ -80,6 +80,13 @@ Ezek a szabályok a SPEC 1–4. pontjait egészítik ki a megvalósítás során
 - **Zárlat:** egy összefüggő komponensben `L1`+`N` vagy `L1`+`PE`. `N`+`PE` együtt nem számít zárlatnak (nincs ÁVK az MVP-ben).
 - **Csípőfogó:** a vezeték törlése csak akkor sikerül, ha mindkét vég mechanikailag laza; különben rövid hibaüzenet.
 - **Normál mód:** nincs tooltip a kapcsokon. **Debug:** tooltip, élő vezeték fénylése, laza kötések számlálója.
+- **Szabványos kábelszín validáció:**
+  - A rendszer kizárólag a 3 villamos alapszabályt kéri számon:
+    - **Fázisvezető / vezérlés:** kizárólag **Fekete (`L1`)** vezeték (a fáziságak `L1/L2/L3` között nincs külön színkövetelmény, minden fázis- és kapcsolt ág Fekete vezetékkel szabályos; kék vagy zöld-sárga szín használata tiltott).
+    - **Nullavezető (`N`):** kizárólag **Kék (`N`)** vezeték (fekete vagy zöld-sárga tilos).
+    - **Védővezető (`PE`):** kizárólag **Zöld-sárga (`PE`)** vezeték (egyéb színek tiltottak).
+  - **Statikus és dinamikus ellenőrzés:** kikapcsolt és bekapcsolt kismegszakítóknál egyaránt azonnal lefut; a gráfösszefüggések (BFS) segítségével a WAGO-k áramköri szerepkörét is automatikusan felderíti, valamint jelzi a közvetlen zárlatos keresztkötéseket.
+  - **Interakció:** Az eszköztáron elhelyezett `🎨 Színellenőrzés` gombbal lebegő panel nyitható meg, amely tételesen listázza a hibákat kapcsolati pontokkal és indoklással, a hibás vezetékek körül pedig élénk piros szaggatott aura és figyelmeztető jelvény jelenik meg a Canvas-on.
 
 
 ## 8. Teljes Iskolai Oktatófal Kiosztás és Bővített Rendszer

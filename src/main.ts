@@ -18,8 +18,10 @@ import {
   type DraftWire,
 } from "./canvas/input";
 import { LegendTableViewer } from "./canvas/legendTable";
+import { ColorCheckPanel } from "./canvas/colorCheckPanel";
 import { WIRE_COLORS } from "./data/colors";
 import { createPrototypeWorld } from "./data/prototypeTrack";
+import { checkWireColors } from "./engine/colorCheck";
 import { portPotential, simulate } from "./engine/simulation";
 import type { Port, SimState, ToolMode, WireColorId, World } from "./models/types";
 import {
@@ -81,6 +83,20 @@ const legendViewer = new LegendTableViewer({
   },
 });
 
+let colorCheckActive = false;
+let colorCheckResult = checkWireColors(world, sim);
+const colorCheckPanel = new ColorCheckPanel({
+  onClose: () => {
+    colorCheckActive = false;
+    paintToolbar();
+    draw();
+  },
+  onHoverWire: (wireId) => {
+    hoverWireId = wireId;
+    draw();
+  },
+});
+
 // Panning state
 let isPanning = false;
 let panStart = { clientX: 0, clientY: 0, ox: 0, oy: 0 };
@@ -97,6 +113,10 @@ function showToast(message: string) {
 
 function runSim() {
   sim = simulate(world);
+  colorCheckResult = checkWireColors(world, sim);
+  if (colorCheckActive) {
+    colorCheckPanel.update(colorCheckResult);
+  }
   if (sim.shortCircuit) {
     showToast(sim.warnings[0] ?? "Zárlat keletkezett! A kismegszakító leoldott.");
   }
@@ -185,6 +205,7 @@ function paintToolbar() {
     </div>
     <div class="group">
       <button type="button" data-legend class="highlight-btn" title="Sorkapocs-kiosztási magyarázó tábla megnyitása">📋 Sorkapocs tábla</button>
+      <button type="button" data-color-check class="${colorCheckActive ? "active" : ""}" title="Szabványos kábelszínek ellenőrzése">🎨 Színellenőrzés</button>
     </div>
     <div class="group">
       <button type="button" data-debug class="${debug ? "active" : ""}">Hibakereső mód</button>
@@ -244,6 +265,9 @@ function draw() {
     draft: draft ? { points: draft.points, color: draft.color } : undefined,
     tooltip: hoverPortId ? tooltipForPort(hoverPortId) : undefined,
     motorAngle,
+    colorCheckActive,
+    invalidWireIds: new Set(colorCheckResult.issues.map((i) => i.wireId)),
+    colorCheckSummary: colorCheckResult.summary,
   });
 }
 
@@ -800,6 +824,20 @@ toolbar.addEventListener("click", (event) => {
     return;
   }
 
+  if (target.closest("[data-color-check]")) {
+    colorCheckActive = !colorCheckActive;
+    if (colorCheckActive) {
+      colorCheckResult = checkWireColors(world, sim);
+      colorCheckPanel.update(colorCheckResult);
+      colorCheckPanel.show();
+    } else {
+      colorCheckPanel.hide();
+    }
+    paintToolbar();
+    draw();
+    return;
+  }
+
   if (target.closest("[data-debug]")) {
     debug = !debug;
     paintToolbar();
@@ -814,6 +852,8 @@ toolbar.addEventListener("click", (event) => {
     pendingLeverPort = undefined;
     hoveredWagoId = undefined;
     hoveredWagoBoxSlots = undefined;
+    colorCheckActive = false;
+    colorCheckPanel.hide();
     runSim();
     paintToolbar();
     draw();

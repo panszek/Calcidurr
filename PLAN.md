@@ -340,7 +340,22 @@ flowchart LR
     - Fázishiba esetén a motor mechanikusan vibrál/rezeg a képernyőn.
     - Digitális LED állapotkijelző panel a motor tetején (`ÁLL (0.0 A)`, `Y ↻ CSILLAG 1.8 A`, `Δ ↻ DELTA 5.4 A`, `⚡ FÁZISHIBA! 8.5 A`).
   - **Tesztek:** [`src/__tests__/motor.test.ts`](file:///c:/Users/SIH6SS/Calcidurr/src/__tests__/motor.test.ts) (10 teszt: inicializálás, védelem, direkt Csillag üzem, forgásirány-váltás, hiányzó PE figyelmeztetés, fázishiba, direkt Delta üzem, nyitott tekercsek, mágneskapcsolós Csillag-Delta átkapcsolás és Y+Δ egyidejű zárlatvédelem) mind zöld.
-- [ ] **5. szál (Kábelszín validáció):** 5. pont (fekete / kék / zöld-sárga szabályrendszer + hibaösszesítő és Canvas kiemelés) + `colorCheck.test.ts`.
+- [x] **5. szál (Kábelszín validáció) — KÉSZ (Szabályrendszer + Statikus/dinamikus gráf + Lebegő panel + Canvas kiemelés):** A 3 szabványos alapszabályra épülő kábelszín-ellenőrző rendszer megvalósítva, összefüggő komponens gráfbejárással, lebegő modern információs panellel, eszköztár gombbal és élénk piros szaggatott Canvas kiemeléssel a hibás vezetékek körül. Vitest automatizált tesztek és build zöldek (`85/85` teszt + `npm run build` sikeres):
+  - **Szabályrendszer (`src/engine/colorCheck.ts`):**
+    - **Fázisvezető / vezérlőág:** kizárólag **Fekete (`L1`)**! Nincs különbségtétel fáziságak (`L1/L2/L3`) között — minden fázisforrás, kapcsoló, nyomógomb, mágneskapcsoló és motor tekercs Fekete vezetékkel szabályos. Kék vagy zöld-sárga (valamint barna, szürke, piros) használata tiltott és hibaként van jelölve.
+    - **Nullavezető (`N`):** kizárólag **Kék (`N`)**! Táp nullák (`top_3n`, `top_1n`), fogyasztók nulla pontjai, tekercs `A2` és relé `N` kivezetései. Fekete vagy zöld-sárga vezeték használata tilos.
+    - **Védővezető (`PE`):** kizárólag **Zöld-sárga (`PE`)**! Táp védővezető, dugalj/izzó/motor `PE` pontjai. Más szín használata szigorúan tiltott.
+  - **Statikus + dinamikus felismerő motor (`src/engine/colorCheck.ts`):**
+    - **Kikapcsolt kismegszakítóknál is működik:** az előszerelt 119 sorkapocspont és a 7 motorkivezetés funkcionális szerepkörei alapján a huzalozás már a tápfeszültség bekapcsolása előtt azonnal validálható.
+    - **Hálózat- és WAGO-terjesztés:** a bekötött gráf összefüggő komponenseinek (BFS) bejárásával a WAGO blokkok automatikusan átveszik a hozzájuk csatlakoztatott áramkör szerepkörét (Nulla-elosztásnál a WAGO és minden leágazása Kék, Fázis-elosztásnál Fekete, PE-nél Zöld-sárga).
+    - **Közvetlen zárlati / keresztkötés felismerése:** Fázis és Nulla, Fázis és PE, vagy Nulla és PE közé közvetlenül bekötött vezetékek azonnal kiemelt hibaként jelennek meg részletes magyarázattal.
+  - **Felhasználói felület és interakció (`src/canvas/colorCheckPanel.ts`, `src/main.ts`, `src/style.css`):**
+    - **Eszköztár gomb:** `🎨 Színellenőrzés` gomb a felső sávban, aktív állapotjelzővel.
+    - **Lebegő ellenőrző panel (`ColorCheckPanel`):** modern, sötét tónusú kártya a jobb felső sarokban összesítéssel (`X/Y vezeték színhelyes`), állapotjelző szalaggal (Zöld: 100% siker, Piros: hibák listája), és az alkalmazott érszabályok összefoglalójával.
+    - **Részletes hibakártyák:** minden hibás vezetékhez megjelenik a kezdő- és végpont pontos felirata (pl. `1P B10A [L1] ➔ Egypólusú kapcsoló 101 [1]`), az aktuális vs. elvárt szín színmintákkal (swatch), valamint a szabványossági indoklás.
+    - **Élő Canvas kiemelés (`src/canvas/renderer.ts`):** a hibás vezetékek körül élénk, pulzáló piros szaggatott aura rajzolódik ki, a vezeték felezőpontján pedig piros `✕` hibajelvény látható. A hibalistán az egérrel lebegve a fókuszált vezeték azonnal kiemelődik.
+    - **Debug overlay integráció:** bekapcsolt Hibakereső módban a színstátusz a debug infósávban is élőben megjelenik.
+  - **Tesztek:** [`src/__tests__/colorCheck.test.ts`](file:///c:/Users/SIH6SS/Calcidurr/src/__tests__/colorCheck.test.ts) (14 teszt: üres pálya, kikapcsolt MCB melletti 100% siker, Fekete L2/L3 és kapcsolt ágak elfogadása, Kék fázisban, Fekete nullán, nem zöld-sárga PE-n, tiltott zöld-sárga fázisban/nullán, Barna/Szürke/Piros fáziságban, WAGO Nulla-terjesztés, WAGO hibás Nulla- és Fázis-elágazások, motor Csillag/Delta és PE validáció, közvetlen fázis-nulla zárlati keresztkötés, valamint bekapcsolt dinamikus szimulációs működés) mind zöld.
 - [ ] **6. szál (UNI-T vizsgáló):** 2. pont (feszültség- és folytonosságvizsgáló + hang + közös lebegő műszerpanel) + `measurements.test.ts`.
 - [ ] **7. szál (Lakatfogó):** 4. pont (fázor áramhálózat-megoldó + lakatfogó pofa és kijelző) + `currentSolver.test.ts`.
 - [ ] **8. szál (Grafikus eszközök, tekercsek, szerszámok):** 6. pont (szöveg nélküli SVG eszköztár + teljes interaktív munkapad + egyedi kurzorok).

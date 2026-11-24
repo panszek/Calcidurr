@@ -163,3 +163,25 @@ export interface MotorState {
   wPhase: Potential;
   current: number;
 }
+
+export type ExpectedWireRole = "phase" | "neutral" | "pe";
+
+export interface WireColorIssue {
+  wireId: string;
+  wire: Wire;
+  expectedRole: ExpectedWireRole;
+  expectedColor: WireColorId;
+  actualColor: WireColorId;
+  reason: string;
+  fromLabel: string;
+  toLabel: string;
+}
+
+export interface ColorCheckResult {
+  totalWires: number;
+  correctWires: number;
+  valid: boolean;
+  issues: WireColorIssue[];
+  summary: string;
+}
+
