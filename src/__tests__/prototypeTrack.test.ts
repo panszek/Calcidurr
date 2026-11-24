@@ -11,6 +11,14 @@ describe("Prototype track initial state (Thread 1: All OFF + Loose Screws)", () 
     const mcb10 = world.devices.find((d) => d.id === "mcb_1p_b10")!;
     const mcb16 = world.devices.find((d) => d.id === "mcb_1p_b16")!;
     const mp = world.devices.find((d) => d.id === "dev_motor_protector")!;
+    const rcd3p = world.devices.find((d) => d.id === "rcd_3p")!;
+    const rcd1p = world.devices.find((d) => d.id === "rcd_1p")!;
+
+    expect(rcd3p).toBeDefined();
+    expect(rcd3p.on).toBe(false);
+
+    expect(rcd1p).toBeDefined();
+    expect(rcd1p.on).toBe(false);
 
     expect(mcb3p).toBeDefined();
     expect(mcb3p.on).toBe(false);
@@ -44,7 +52,7 @@ describe("Prototype track initial state (Thread 1: All OFF + Loose Screws)", () 
     }
   });
 
-  it("has zero live phase voltages on all terminals initially (only passive PE and N feeds)", () => {
+  it("has zero live phase voltages on all terminals initially (only passive PE feed active)", () => {
     const world = createPrototypeWorld();
     const sim = simulate(world);
 
@@ -52,34 +60,48 @@ describe("Prototype track initial state (Thread 1: All OFF + Loose Screws)", () 
     expect(sim.liveNodeIds.size).toBe(0);
     expect(sim.shortCircuit).toBe(false);
 
-    // Breaker outputs are dead (none)
+    // Breaker outputs and neutral feeds behind OFF RCDs are dead (none)
     expect(sim.potential["mcb1_b10_l1"]).toBe("none");
     expect(sim.potential["mcb1_b16_l1"]).toBe("none");
     expect(sim.potential["mcb3_l1"]).toBe("none");
     expect(sim.potential["mcb3_l2"]).toBe("none");
     expect(sim.potential["mcb3_l3"]).toBe("none");
+    expect(sim.potential["top_1n"]).toBe("none");
+    expect(sim.potential["top_3n"]).toBe("none");
 
-    // Passive ground and neutral feeds are available
+    // Passive ground feed is available
     expect(sim.potential["top_pe"]).toBe("PE");
-    expect(sim.potential["top_1n"]).toBe("N");
-    expect(sim.potential["top_3n"]).toBe("N");
   });
 
-  it("activates phase output only after the upstream breaker is toggled ON", () => {
+  it("activates phase output only after both upstream RCD and breaker are toggled ON", () => {
     const world = createPrototypeWorld();
 
-    // Toggle 1P B10A ON
+    // 1P B10A ON alone while 2P ÁVK is OFF -> output remains 'none'
     toggleDevice(world, "mcb_1p_b10");
+    const sim0 = simulate(world);
+    expect(sim0.potential["mcb1_b10_l1"]).toBe("none");
+    expect(sim0.potential["top_1n"]).toBe("none");
+
+    // Toggle 2P ÁVK ON -> 1P B10A outputs L1 and 1F N outputs N
+    toggleDevice(world, "rcd_1p");
     const sim1 = simulate(world);
     expect(sim1.potential["mcb1_b10_l1"]).toBe("L1");
+    expect(sim1.potential["top_1n"]).toBe("N");
     expect(sim1.potential["mcb1_b16_l1"]).toBe("none");
     expect(sim1.potential["mcb3_l1"]).toBe("none");
 
-    // Toggle 3P C16A ON
+    // 3P C16A ON alone while 4P ÁVK is OFF -> output remains 'none'
     toggleDevice(world, "mcb_3p");
     const sim2 = simulate(world);
-    expect(sim2.potential["mcb3_l1"]).toBe("L1");
-    expect(sim2.potential["mcb3_l2"]).toBe("L2");
-    expect(sim2.potential["mcb3_l3"]).toBe("L3");
+    expect(sim2.potential["mcb3_l1"]).toBe("none");
+    expect(sim2.potential["top_3n"]).toBe("none");
+
+    // Toggle 4P ÁVK ON -> 3P outputs L1, L2, L3 and 3F N outputs N
+    toggleDevice(world, "rcd_3p");
+    const sim3 = simulate(world);
+    expect(sim3.potential["mcb3_l1"]).toBe("L1");
+    expect(sim3.potential["mcb3_l2"]).toBe("L2");
+    expect(sim3.potential["mcb3_l3"]).toBe("L3");
+    expect(sim3.potential["top_3n"]).toBe("N");
   });
 });

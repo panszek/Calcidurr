@@ -1,5 +1,5 @@
 import type { Potential, SimState, World } from "../models/types";
-import { isWireEndSecure, tripMcb } from "../models/world";
+import { isWireEndSecure, tripMcb, tripRcd } from "../models/world";
 
 const LIVE: Potential[] = ["L1", "L2", "L3"];
 
@@ -9,6 +9,8 @@ function emptySim(): SimState {
     liveNodeIds: new Set(),
     shortCircuit: false,
     shortDetail: "",
+    rcdTripped: false,
+    rcdDetail: "",
     lampOn: new Set(),
     contactorOn: new Set(),
     activeDevices: new Set(),
@@ -156,52 +158,129 @@ function neighborsOf(world: World, energizedContactors: Set<string>): Map<string
   return adj;
 }
 
-function sourceOf(world: World, nodeId: string): Potential {
+function sourceOf(world: World, nodeId: string): { pot: Potential; breakerId?: string; rcdId?: string } {
   const node = world.nodes[nodeId];
-  if (!node?.sourcePotential) return "none";
+  if (!node?.sourcePotential) return { pot: "none" };
 
-  if (node.breakerId) {
-    const breaker = world.devices.find((d) => d.id === node.breakerId);
-    if (!breaker?.on) return "none";
-  } else if (node.sourcePotential === "L1") {
-    const mcb = world.devices.find((d) => d.id === world.mcbId);
-    if (mcb && !mcb.on) return "none";
+  // 1. Upstream ÁVK (RCD) tápfüggőség
+  if (node.rcdId) {
+    const rcd = world.devices.find((d) => d.id === node.rcdId);
+    if (!rcd?.on) return { pot: "none" };
   }
 
-  return node.sourcePotential;
+  // 2. Kismegszakító (MCB) tápfüggőség
+  if (node.breakerId) {
+    const breaker = world.devices.find((d) => d.id === node.breakerId);
+    if (!breaker?.on) return { pot: "none" };
+  } else if (node.sourcePotential === "L1") {
+    const mcb = world.devices.find((d) => d.id === world.mcbId);
+    if (mcb && !mcb.on) return { pot: "none" };
+  }
+
+  return { pot: node.sourcePotential, breakerId: node.breakerId, rcdId: node.rcdId };
+}
+
+interface PropagateResult {
+  potential: Record<string, Potential>;
+  shortCircuit: boolean;
+  shortDetail: string;
+  faultyBreakerIds: Set<string>;
+  faultyRcdIds: Set<string>;
+  rcdTripped: boolean;
+  rcdDetail: string;
+  nodeRcd: Record<string, string>;
+  nodeBreaker: Record<string, string>;
 }
 
 function propagate(
   world: World,
   adj: Map<string, string[]>,
-): {
-  potential: Record<string, Potential>;
-  shortCircuit: boolean;
-  shortDetail: string;
-  faultyBreakerIds: Set<string>;
-} {
+): PropagateResult {
   const potential: Record<string, Potential> = {};
   for (const id of Object.keys(world.nodes)) potential[id] = "none";
 
+  const nodeRcd: Record<string, string> = {};
+  const nodeBreaker: Record<string, string> = {};
   const visited = new Set<string>();
+
   let shortCircuit = false;
   let shortDetail = "";
+  let rcdTripped = false;
+  let rcdDetail = "";
   const faultyBreakerIds = new Set<string>();
+  const faultyRcdIds = new Set<string>();
 
-  const seeds = Object.values(world.nodes)
-    .map((node) => ({
-      id: node.id,
-      pot: sourceOf(world, node.id),
-      breakerId: node.breakerId ?? (node.sourcePotential === "L1" ? world.mcbId : undefined),
-    }))
-    .filter((s) => s.pot !== "none");
+  const seeds: Array<{
+    id: string;
+    pot: Exclude<Potential, "none">;
+    breakerId?: string;
+    rcdId?: string;
+  }> = [];
+
+  for (const node of Object.values(world.nodes)) {
+    const src = sourceOf(world, node.id);
+    if (src.pot !== "none") {
+      seeds.push({
+        id: node.id,
+        pot: src.pot,
+        breakerId: src.breakerId,
+        rcdId: src.rcdId,
+      });
+    }
+  }
 
   for (const seed of seeds) {
-    if (visited.has(seed.id) && potential[seed.id] !== "none" && potential[seed.id] !== seed.pot) {
-      shortCircuit = true;
-      shortDetail = `${potential[seed.id]} és ${seed.pot} zárlat`;
-      if (seed.breakerId) faultyBreakerIds.add(seed.breakerId);
-      break;
+    // 1. Collision check at the seed itself if already reached by another seed
+    if (visited.has(seed.id) && potential[seed.id] !== "none") {
+      const existing = potential[seed.id];
+      const existingRcd = nodeRcd[seed.id];
+      const existingBreaker = nodeBreaker[seed.id];
+
+      if (existing !== seed.pot) {
+        const isLiveFault =
+          (LIVE.includes(existing) && (seed.pot === "N" || seed.pot === "PE")) ||
+          (LIVE.includes(seed.pot) && (existing === "N" || existing === "PE")) ||
+          (LIVE.includes(existing) && LIVE.includes(seed.pot));
+
+        if (isLiveFault) {
+          shortCircuit = true;
+          shortDetail =
+            existing === "PE" || seed.pot === "PE"
+              ? "Fázis–Védővezető (L–PE) testzárlat"
+              : `${existing} és ${seed.pot} zárlat`;
+          if (seed.breakerId) faultyBreakerIds.add(seed.breakerId);
+          if (existingBreaker) faultyBreakerIds.add(existingBreaker);
+
+          if (existing === "PE" || seed.pot === "PE") {
+            rcdTripped = true;
+            rcdDetail = "ÁVK hibaáram-leoldás: Fázis–Védővezető (L–PE) testzárlat.";
+            if (seed.rcdId) faultyRcdIds.add(seed.rcdId);
+            if (existingRcd) faultyRcdIds.add(existingRcd);
+          } else if (seed.rcdId && existingRcd && seed.rcdId !== existingRcd) {
+            rcdTripped = true;
+            rcdDetail = "ÁVK hibaáram-leoldás: Kereszt-fázis/nulla zárlat eltérő ÁVK-k között.";
+            faultyRcdIds.add(seed.rcdId);
+            faultyRcdIds.add(existingRcd);
+          }
+          break;
+        } else if ((existing === "N" && seed.pot === "PE") || (existing === "PE" && seed.pot === "N")) {
+          const activeRcd = existingRcd ?? seed.rcdId;
+          if (activeRcd) {
+            rcdTripped = true;
+            rcdDetail = "ÁVK hibaáram-leoldás: Nullavezető (N) és Védővezető (PE) zárlat/összekötés. ÁVK leoldott.";
+            faultyRcdIds.add(activeRcd);
+            break;
+          }
+        }
+      } else if (existing === "N" && seed.pot === "N") {
+        if (existingRcd && seed.rcdId && existingRcd !== seed.rcdId) {
+          rcdTripped = true;
+          rcdDetail = "ÁVK hibaáram-leoldás: A 3 fázisú és 1 fázisú hálózat nullavezetője (3F N és 1F N) össze van kötve. Mindkét ÁVK leoldott.";
+          faultyRcdIds.add(existingRcd);
+          faultyRcdIds.add(seed.rcdId);
+          break;
+        }
+      }
     }
 
     const queue = [seed.id];
@@ -214,31 +293,79 @@ function propagate(
       visited.add(cur);
 
       const existing = potential[cur];
-      if (existing !== "none" && existing !== seed.pot) {
-        const pair = [existing, seed.pot].sort().join("+");
-        const isFault =
-          (LIVE.includes(existing) && (seed.pot === "N" || seed.pot === "PE")) ||
-          (LIVE.includes(seed.pot) && (existing === "N" || existing === "PE")) ||
-          (LIVE.includes(existing) && LIVE.includes(seed.pot) && existing !== seed.pot);
+      const existingRcd = nodeRcd[cur];
+      const existingBreaker = nodeBreaker[cur];
 
-        if (isFault) {
-          shortCircuit = true;
-          shortDetail = `${pair.replace("+", " és ")} zárlat`;
-          if (seed.breakerId) faultyBreakerIds.add(seed.breakerId);
+      if (existing !== "none") {
+        if (existing !== seed.pot) {
+          const isLiveFault =
+            (LIVE.includes(existing) && (seed.pot === "N" || seed.pot === "PE")) ||
+            (LIVE.includes(seed.pot) && (existing === "N" || existing === "PE")) ||
+            (LIVE.includes(existing) && LIVE.includes(seed.pot));
+
+          if (isLiveFault) {
+            shortCircuit = true;
+            shortDetail =
+              existing === "PE" || seed.pot === "PE"
+                ? "Fázis–Védővezető (L–PE) testzárlat"
+                : `${[existing, seed.pot].sort().join(" és ")} zárlat`;
+            if (seed.breakerId) faultyBreakerIds.add(seed.breakerId);
+            if (existingBreaker) faultyBreakerIds.add(existingBreaker);
+
+            if (existing === "PE" || seed.pot === "PE") {
+              rcdTripped = true;
+              rcdDetail = "ÁVK hibaáram-leoldás: Fázis–Védővezető (L–PE) testzárlat.";
+              if (seed.rcdId) faultyRcdIds.add(seed.rcdId);
+              if (existingRcd) faultyRcdIds.add(existingRcd);
+            } else if (seed.rcdId && existingRcd && seed.rcdId !== existingRcd) {
+              rcdTripped = true;
+              rcdDetail = "ÁVK hibaáram-leoldás: Kereszt-fázis/nulla zárlat eltérő ÁVK-k között.";
+              faultyRcdIds.add(seed.rcdId);
+              faultyRcdIds.add(existingRcd);
+            }
+          } else if ((existing === "N" && seed.pot === "PE") || (existing === "PE" && seed.pot === "N")) {
+            const activeRcd = existingRcd ?? seed.rcdId;
+            if (activeRcd) {
+              rcdTripped = true;
+              rcdDetail = "ÁVK hibaáram-leoldás: Nullavezető (N) és Védővezető (PE) zárlat/összekötés. ÁVK leoldott.";
+              faultyRcdIds.add(activeRcd);
+            }
+          }
+          continue;
+        } else if (existing === "N" && seed.pot === "N") {
+          if (existingRcd && seed.rcdId && existingRcd !== seed.rcdId) {
+            rcdTripped = true;
+            rcdDetail = "ÁVK hibaáram-leoldás: A 3 fázisú és 1 fázisú hálózat nullavezetője (3F N és 1F N) össze van kötve. Mindkét ÁVK leoldott.";
+            faultyRcdIds.add(existingRcd);
+            faultyRcdIds.add(seed.rcdId);
+            continue;
+          }
         }
-        continue;
       }
 
       potential[cur] = seed.pot;
+      if (seed.rcdId) nodeRcd[cur] = seed.rcdId;
+      if (seed.breakerId) nodeBreaker[cur] = seed.breakerId;
+
       for (const next of adj.get(cur) ?? []) {
         if (!seen.has(next)) queue.push(next);
       }
     }
 
-    if (shortCircuit) break;
+    if (shortCircuit || rcdTripped) break;
   }
 
-  return { potential, shortCircuit, shortDetail, faultyBreakerIds };
+  return {
+    potential,
+    shortCircuit,
+    shortDetail,
+    faultyBreakerIds,
+    faultyRcdIds,
+    rcdTripped,
+    rcdDetail,
+    nodeRcd,
+    nodeBreaker,
+  };
 }
 
 export function simulate(world: World): SimState {
@@ -256,17 +383,80 @@ export function simulate(world: World): SimState {
     result.potential = pass.potential;
     result.shortCircuit = pass.shortCircuit;
     result.shortDetail = pass.shortDetail;
+    result.rcdTripped = pass.rcdTripped;
+    result.rcdDetail = pass.rcdDetail;
 
-    if (result.shortCircuit) {
-      // Trip faulty breaker(s)
-      if (pass.faultyBreakerIds.size > 0) {
-        for (const bid of pass.faultyBreakerIds) tripMcb(world, bid);
-      } else {
-        tripMcb(world);
+    // Check for consumer cross-neutral or N-PE faults on energized consumers
+    if (!pass.shortCircuit && !pass.rcdTripped) {
+      const checkConsumer = (lNodeId: string, nNodeId: string, devTitle: string) => {
+        const lPot = pass.potential[lNodeId] ?? "none";
+        const nPot = pass.potential[nNodeId] ?? "none";
+        if (!LIVE.includes(lPot)) return;
+
+        const rcdL = pass.nodeRcd[lNodeId];
+        const rcdN = pass.nodeRcd[nNodeId];
+
+        if (nPot === "N") {
+          if (rcdL && rcdN && rcdL !== rcdN) {
+            pass.rcdTripped = true;
+            pass.faultyRcdIds.add(rcdL);
+            pass.faultyRcdIds.add(rcdN);
+            pass.rcdDetail = `ÁVK hibaáram-leoldás: Keresztbe kötött nulla hiba a(z) ${devTitle} fogyasztónál (${rcdL === "rcd_1p" ? "1P fázis és 3F nulla" : "3F fázis és 1F nulla"}). Mindkét ÁVK leoldott.`;
+          }
+        } else if (nPot === "PE") {
+          if (rcdL) {
+            pass.rcdTripped = true;
+            pass.faultyRcdIds.add(rcdL);
+            pass.rcdDetail = `ÁVK hibaáram-leoldás: A(z) ${devTitle} fogyasztó nullavezető helyett a védővezetőre (PE) van kötve. ÁVK leoldott.`;
+          }
+        }
+      };
+
+      for (const d of world.devices) {
+        if (d.type === "lamp" && d.nodeIds.length >= 2) {
+          checkConsumer(d.nodeIds[0], d.nodeIds[1], d.title);
+        } else if (d.type === "socket" && d.nodeIds.length >= 2) {
+          checkConsumer(d.nodeIds[0], d.nodeIds[1], d.title);
+        } else if (d.type === "contactor" && d.nodeIds.length >= 6) {
+          checkConsumer(d.nodeIds[4], d.nodeIds[5], d.title);
+        } else if (d.type === "impulse_relay" && d.nodeIds.length >= 2) {
+          checkConsumer(d.nodeIds[0], d.nodeIds[1], d.title);
+        } else if (d.type === "staircase_relay" && d.nodeIds.length >= 3) {
+          checkConsumer(d.nodeIds[2], d.nodeIds[0], d.title);
+        } else if (d.type === "timer_relay" && d.nodeIds.length >= 5) {
+          checkConsumer(d.nodeIds[0], d.nodeIds[4], d.title);
+        } else if (d.type === "motion_sensor" && d.nodeIds.length >= 2) {
+          checkConsumer(d.nodeIds[0], d.nodeIds[1], d.title);
+        }
+        if (pass.rcdTripped) break;
       }
-      result.warnings.push(`Zárlatvédelem: ${result.shortDetail || "rövidzárlat"}. Megszakító leoldott.`);
+      result.rcdTripped = pass.rcdTripped;
+      result.rcdDetail = pass.rcdDetail;
+    }
 
-      // Re-run with tripped breakers
+    if (result.shortCircuit || pass.rcdTripped) {
+      if (result.shortCircuit) {
+        if (pass.faultyBreakerIds.size > 0) {
+          for (const bid of pass.faultyBreakerIds) tripMcb(world, bid);
+        } else {
+          tripMcb(world);
+        }
+      }
+      if (pass.faultyRcdIds.size > 0) {
+        for (const rid of pass.faultyRcdIds) tripRcd(world, rid);
+      } else if (pass.rcdTripped) {
+        tripRcd(world);
+      }
+
+      if (result.shortCircuit && pass.rcdTripped) {
+        result.warnings.push(`Zárlat és hibaáram-leoldás: ${result.shortDetail || "zárlat"}. Megszakító és ÁVK leoldott.`);
+      } else if (result.shortCircuit) {
+        result.warnings.push(`Zárlatvédelem: ${result.shortDetail || "rövidzárlat"}. Megszakító leoldott.`);
+      } else {
+        result.warnings.push(pass.rcdDetail || "ÁVK hibaáram-leoldás: Hibaáram észlelve, az ÁVK leoldott.");
+      }
+
+      // Re-run with tripped breakers & RCDs
       const safeAdj = neighborsOf(world, new Set());
       const safePass = propagate(world, safeAdj);
       result.potential = safePass.potential;
@@ -296,7 +486,7 @@ export function simulate(world: World): SimState {
     if (same) break;
   }
 
-  if (!result.shortCircuit) {
+  if (!result.shortCircuit && !result.rcdTripped) {
     result.contactorOn = contactors;
 
     // Evaluate Impulse relay pulse

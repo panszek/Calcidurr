@@ -29,11 +29,21 @@ export function setDeviceOn(world: World, deviceId: string, on: boolean): void {
  */
 export function enableSupply(
   world: World,
-  deviceIds: string[] = ["mcb_1p_b10", "mcb_1p_b16", "mcb_3p", "dev_motor_protector"],
+  deviceIds: string[] = ["rcd_3p", "rcd_1p", "mcb_1p_b10", "mcb_1p_b16", "mcb_3p", "dev_motor_protector"],
 ): void {
   for (const id of deviceIds) {
     const dev = world.devices.find((d) => d.id === id);
     if (dev) dev.on = true;
+  }
+  // Ha valamelyik 1P/3P kismegszakító be van kapcsolva a tesztben,
+  // az upstream ÁVK-t is kapcsoljuk be automatikusan
+  if (deviceIds.includes("mcb_1p_b10") || deviceIds.includes("mcb_1p_b16")) {
+    const rcd1 = world.devices.find((d) => d.id === "rcd_1p");
+    if (rcd1) rcd1.on = true;
+  }
+  if (deviceIds.includes("mcb_3p")) {
+    const rcd3 = world.devices.find((d) => d.id === "rcd_3p");
+    if (rcd3) rcd3.on = true;
   }
 }
 

@@ -151,3 +151,21 @@ A prototípus validációja és a valós fotó (`sources/sorkapocs_kiosztas.png`
 - **Wago blokkok:** Az alsó sorkapocssor alatt 5 darab 5-ös Wago összekötő blokk működő, egyenként kattintható emelőkarokkal (`y = 635`).
 - **Valósághű Magyarázó Plakát a falon (`y = 725..1040`):** Közvetlenül a Canvas felületén elhelyezett nagy méretű (1460 x 315 px) plakát, amely nemcsak egyszerű színcsíkokat mutat, hanem feliratozva, oszloponként részletesen ábrázolja a teljes 65-ös felső és 54-es alsó sorkapocskiosztást (eszköznevek, kapocsponti jelölések, színkód-négyzetek).
 - A szimulációs motorban mind a 3 fázis, mind a védelmi eszközök (C16A, B10A, B16A, motorvédő), az impulzusrelé, lépcsőházi automata, időrelé, mágneskapcsolók (fő- és segédérintkezők) és fényforrások/érzékelők teljes gráf-alapú logikája implementálva van.
+
+### 8.6. Áram-védőkapcsolók (ÁVK / FI-relé) és Védelmi Rendszer:
+- **Két ÁVK a kiselosztóban (`sources/pelda_kotes.jpg` kiosztás):**
+  - **4P ÁVK (`rcd_3p`, 40A / 30mA):** a `3P C16A` kismegszakítót és a `3 Fázis Nullája` (`top_3n`) ágat védi.
+  - **2P ÁVK (`rcd_1p`, 25A / 30mA):** az `1P B10A` és `1P B16A` kismegszakítókat és az `1 Fázis Nullája` (`top_1n`) ágat védi.
+  - Az ÁVK-knak nincs külön külső sorkapocs kivezetésük: belső védelmi eszközként közvetlenül az általuk védett megszakítók és nullavezetők elé vannak bekötve.
+- **Kezdőállapot és Upstream tápfüggőség:**
+  - Mindkét ÁVK alapértelmezetten lekapcsolt (`KI`, `on: false`) állapotban indul.
+  - Ha egy ÁVK `KI` állásban van, a mögötte lévő kismegszakítók és a hozzá tartozó nulla sorkapocs feszültségmentesek (`"none"`), még akkor is, ha maga a kismegszakító fel van kapcsolva.
+- **Működő T tesztgomb és főkar (Kéz eszközzel):**
+  - **Főkar (`BE / KI`):** kézi működtetés, optikai állapotjelzővel (Zöld: nyitott/KI, Piros: zárt/BE).
+  - **`T` tesztgomb:** `BE` állapotban megnyomva azonnal leoldja az ÁVK-t; `KI` állapotban nem vált ki leoldást.
+- **Hibaáram- és zárlatvédelem:**
+  - `L ↔ PE` (fázis–védővezető testzárlat): az érintett ÁVK és a kismegszakító is leold.
+  - `N ↔ PE` (nulla–védővezető érintkezés bekapcsolt ÁVK mögött): az érintett ÁVK leold (a kismegszakító nem).
+  - `3F N ↔ 1F N` összekötés (párhuzamosított nulla ágak): mindkét ÁVK leold.
+  - **Keresztbe kötött nulla fogyasztóknál:** ha egy terhelés fázisa az egyik ÁVK-ról, nullája a másikról érkezik (`1P L` + `3F N` vagy `3F L` + `1F N`), vagy ha a nulla helyett `PE`-re van kötve a fogyasztó, hibaáram miatt az ÁVK-k leoldanak.
+  - **Szelektív leoldás:** a hiba csak a közvetlenül érintett védelmi eszközt oldja le.

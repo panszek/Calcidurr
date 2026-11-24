@@ -283,6 +283,21 @@ export function tripMcb(world: World, breakerId?: string) {
   }
 }
 
+export function tripRcd(world: World, rcdId?: string) {
+  if (rcdId) {
+    const r = world.devices.find((d) => d.id === rcdId);
+    if (r) r.on = false;
+    return;
+  }
+
+  const rcds = world.devices.filter(
+    (d) => d.type === "rcd_3p" || d.type === "rcd_1p" || d.type === "rcd",
+  );
+  for (const r of rcds) {
+    r.on = false;
+  }
+}
+
 export function tickWorld(world: World, dt: number): boolean {
   let changed = false;
 

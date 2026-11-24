@@ -6,6 +6,7 @@ import {
   hitColumnUpperHalf,
   hitDevice,
   hitLegendPoster,
+  hitRcdTestButton,
   hitScrewdriverTarget,
   hitWago,
   hitWagoBox,
@@ -425,6 +426,20 @@ canvas.addEventListener("pointerdown", (event) => {
   }
 
   if (tool === "hand") {
+    // 1. ÁVK T tesztgomb kattintás ellenőrzése
+    const rcdTest = hitRcdTestButton(world, p);
+    if (rcdTest) {
+      if (rcdTest.on) {
+        rcdTest.on = false;
+        runSim();
+        draw();
+        showToast(`${rcdTest.title} teszt sikeres — leoldott!`);
+      } else {
+        showToast(`${rcdTest.title} le van kapcsolva — a tesztgomb csak bekapcsolt (BE) állapotban működik.`);
+      }
+      return;
+    }
+
     const clickedWago = hitWago(world, p);
     if (clickedWago) {
       if (clickedWago.fixed) {

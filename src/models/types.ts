@@ -10,6 +10,9 @@ export type DeviceType =
   | "mcb"
   | "mcb3p"
   | "mcb1p"
+  | "rcd"
+  | "rcd_3p"
+  | "rcd_1p"
   | "switch"
   | "switch_101"
   | "switch_102"
@@ -59,6 +62,7 @@ export interface ElectricalNode {
   functionLabel: string;
   sourcePotential?: Exclude<Potential, "none">;
   breakerId?: string;
+  rcdId?: string;
 }
 
 export interface Port {
@@ -135,6 +139,8 @@ export interface SimState {
   liveNodeIds: Set<string>;
   shortCircuit: boolean;
   shortDetail: string;
+  rcdTripped?: boolean;
+  rcdDetail?: string;
   lampOn: Set<string>;
   contactorOn: Set<string>;
   activeDevices: Set<string>;

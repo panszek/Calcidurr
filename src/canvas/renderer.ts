@@ -127,10 +127,10 @@ function formatPosterGroupTitle(title: string): string {
 }
 
 function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
-  // 1. Kiselosztó szekrény doboza (Distribution enclosure on the left)
+  // 1. Kiselosztó szekrény doboza (Distribution enclosure on the left, x = 40..576)
   ctx.save();
   // Outer white enclosure frame
-  roundRect(ctx, 70, 105, 488, 175, 10);
+  roundRect(ctx, 40, 105, 536, 175, 10);
   ctx.fillStyle = "#f3f5f8";
   ctx.fill();
   ctx.strokeStyle = "#8b929c";
@@ -138,18 +138,18 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 
   // Inner cavity (darker recess)
-  roundRect(ctx, 84, 128, 460, 138, 6);
+  roundRect(ctx, 52, 128, 512, 138, 6);
   ctx.fillStyle = "#2c313a";
   ctx.fill();
 
   // Internal DIN rail
   ctx.fillStyle = "#8d939e";
-  ctx.fillRect(86, 190, 456, 18);
+  ctx.fillRect(54, 190, 508, 18);
   ctx.fillStyle = "#656a73";
-  ctx.fillRect(86, 196, 456, 4);
+  ctx.fillRect(54, 196, 508, 4);
 
   // Smoked semi-transparent acrylic door frame (top hinged)
-  roundRect(ctx, 76, 112, 476, 160, 8);
+  roundRect(ctx, 46, 112, 524, 160, 8);
   ctx.fillStyle = "rgba(40, 52, 68, 0.28)";
   ctx.fill();
   ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
@@ -160,7 +160,7 @@ function drawBackgroundFixtures(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#64748b";
   ctx.font = "700 9px Segoe UI";
   ctx.textAlign = "left";
-  ctx.fillText("KISELOSZTÓ • IP40", 90, 122);
+  ctx.fillText("KISELOSZTÓ • IP40", 58, 122);
   ctx.restore();
 
   // 2. Sorkapocs-kiosztás plakát (Poster on the board under wagos)
@@ -950,6 +950,85 @@ function drawDevices(ctx: CanvasRenderingContext2D, world: World, sim: SimState)
       ctx.font = "800 10px Segoe UI";
       ctx.textAlign = "center";
       ctx.fillText(device.title, x + w / 2, y + h + 14);
+      continue;
+    }
+
+    // 2. ÁVK-k (rcd_3p és rcd_1p) a kiselosztóban
+    if (device.type === "rcd_3p" || device.type === "rcd_1p") {
+      const is3p = device.type === "rcd_3p";
+      // Off-white modular casing
+      roundRect(ctx, x, y, w, h, 4);
+      ctx.fillStyle = "#f8fafc";
+      ctx.fill();
+      ctx.strokeStyle = "#1e293b";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Top label
+      ctx.fillStyle = "#0f172a";
+      ctx.font = is3p ? "800 10px Segoe UI" : "800 9px Segoe UI";
+      ctx.textAlign = "center";
+      ctx.fillText(device.title, x + w / 2, y + 14);
+
+      // Rating label
+      ctx.fillStyle = "#64748b";
+      ctx.font = "700 7.5px Segoe UI";
+      ctx.fillText(is3p ? "40A IΔn 30mA" : "25A 30mA", x + w / 2, y + 23);
+
+      // "T" Test button
+      const btnX = x + 10;
+      const btnY = y + 26;
+      const btnW = 24;
+      const btnH = 18;
+      roundRect(ctx, btnX, btnY, btnW, btnH, 3);
+      ctx.fillStyle = "#0284c7";
+      ctx.fill();
+      ctx.strokeStyle = "#0369a1";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "800 10.5px Segoe UI";
+      ctx.textAlign = "center";
+      ctx.fillText("T", btnX + btnW / 2, btnY + 13);
+
+      // Test hint / schematic
+      if (is3p) {
+        ctx.fillStyle = "#475569";
+        ctx.font = "700 7px monospace";
+        ctx.textAlign = "left";
+        ctx.fillText("TEST", btnX + btnW + 4, btnY + 8);
+        ctx.fillText("~ 30mA", btnX + btnW + 4, btnY + 16);
+      }
+
+      // Optical status indicator window (Green: open/KI, Red: closed/BE)
+      const indX = is3p ? x + w - 16 : x + w - 12;
+      const indY = y + 28;
+      roundRect(ctx, indX - 6, indY, 12, 6, 1.5);
+      ctx.fillStyle = device.on ? "#dc2626" : "#16a34a";
+      ctx.fill();
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+
+      // Main lever handle
+      const leverOn = device.on;
+      const leverX = x + 6;
+      const leverY = y + 48;
+      const leverW = w - 12;
+      const leverH = 46;
+
+      roundRect(ctx, leverX, leverY, leverW, leverH, 3);
+      ctx.fillStyle = leverOn ? "#dc2626" : "#334155";
+      ctx.fill();
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = "#fff";
+      ctx.font = "800 10px Segoe UI";
+      ctx.textAlign = "center";
+      ctx.fillText(leverOn ? "BE" : "KI", x + w / 2, leverY + 28);
       continue;
     }
 

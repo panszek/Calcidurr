@@ -18,8 +18,9 @@ function node(
   label: string,
   sourcePotential?: ElectricalNode["sourcePotential"],
   breakerId?: string,
+  rcdId?: string,
 ): ElectricalNode {
-  return { id, deviceName, functionLabel, label, sourcePotential, breakerId };
+  return { id, deviceName, functionLabel, label, sourcePotential, breakerId, rcdId };
 }
 
 function port(
@@ -50,24 +51,24 @@ export function createPrototypeWorld(): World {
   const nodes: Record<string, ElectricalNode> = {
     // FELSŐ SORKAPOCSSOR (65 db)
     // 1. 3 Fázis Nullája: [N (Kék)]
-    top_3n: node("top_3n", "3 Fázis Nullája", "N táp", "N", "N"),
+    top_3n: node("top_3n", "3 Fázis Nullája", "N táp", "N", "N", undefined, "rcd_3p"),
 
     // 2. 3P C16A Megszakító: [L1, L2, L3]
-    mcb3_l1: node("mcb3_l1", "3P C16A", "L1 kimenet", "L1", "L1", "mcb_3p"),
-    mcb3_l2: node("mcb3_l2", "3P C16A", "L2 kimenet", "L2", "L2", "mcb_3p"),
-    mcb3_l3: node("mcb3_l3", "3P C16A", "L3 kimenet", "L3", "L3", "mcb_3p"),
+    mcb3_l1: node("mcb3_l1", "3P C16A", "L1 kimenet", "L1", "L1", "mcb_3p", "rcd_3p"),
+    mcb3_l2: node("mcb3_l2", "3P C16A", "L2 kimenet", "L2", "L2", "mcb_3p", "rcd_3p"),
+    mcb3_l3: node("mcb3_l3", "3P C16A", "L3 kimenet", "L3", "L3", "mcb_3p", "rcd_3p"),
 
     // 3. 1 Fázis Nullája: [N]
-    top_1n: node("top_1n", "1 Fázis Nullája", "N táp", "N", "N"),
+    top_1n: node("top_1n", "1 Fázis Nullája", "N táp", "N", "N", undefined, "rcd_1p"),
 
     // 4. Védővezető: [PE]
     top_pe: node("top_pe", "Védővezető", "PE táp", "PE", "PE"),
 
     // 5. 1P B10A Megszakító: [L1]
-    mcb1_b10_l1: node("mcb1_b10_l1", "1P B10A", "L1 kimenet", "L1", "L1", "mcb_1p_b10"),
+    mcb1_b10_l1: node("mcb1_b10_l1", "1P B10A", "L1 kimenet", "L1", "L1", "mcb_1p_b10", "rcd_1p"),
 
     // 6. 1P B16A Megszakító: [L1]
-    mcb1_b16_l1: node("mcb1_b16_l1", "1P B16A", "L1 kimenet", "L1", "L1", "mcb_1p_b16"),
+    mcb1_b16_l1: node("mcb1_b16_l1", "1P B16A", "L1 kimenet", "L1", "L1", "mcb_1p_b16", "rcd_1p"),
 
     // 7. Impulzusrelé: [A1, A2, 1, 2]
     imp_a1: node("imp_a1", "Impulzusrelé", "A1 tekercs", "A1"),
@@ -519,24 +520,49 @@ export function createPrototypeWorld(): World {
       energized: false,
     },
 
-    // 2. Kiselosztó doboz a 3 izzó alatt: benne a megszakítók és relék
+    // 2. Kiselosztó doboz a 3 izzó alatt: benne az ÁVK-k, megszakítók és relék
+    // (sorrend: 4P ÁVK -> 3P C16A -> 2P ÁVK -> 1P B10A -> 1P B16A -> Impulzusrelé -> Lépcsőházi aut. -> Időrelé)
+    // 4P ÁVK (rcd_3p, 40A / 30mA)
+    {
+      id: "rcd_3p",
+      type: "rcd_3p",
+      title: "4P ÁVK",
+      bounds: { x: 60, y: 145, w: 72, h: 100 },
+      nodeIds: [],
+      on: false,
+      pressed: false,
+      energized: false,
+      customLabel: "40A / 30mA",
+    },
     // 3P C16A Megszakító
     {
       id: "mcb_3p",
       type: "mcb3p",
       title: "3P C16A",
-      bounds: { x: 100, y: 145, w: 72, h: 100 },
+      bounds: { x: 138, y: 145, w: 62, h: 100 },
       nodeIds: ["mcb3_l1", "mcb3_l2", "mcb3_l3"],
       on: false,
       pressed: false,
       energized: false,
+    },
+    // 2P ÁVK (rcd_1p, 25A / 30mA)
+    {
+      id: "rcd_1p",
+      type: "rcd_1p",
+      title: "2P ÁVK",
+      bounds: { x: 206, y: 145, w: 46, h: 100 },
+      nodeIds: [],
+      on: false,
+      pressed: false,
+      energized: false,
+      customLabel: "25A / 30mA",
     },
     // 1P B10A Megszakító
     {
       id: "mcb_1p_b10",
       type: "mcb1p",
       title: "1P B10A",
-      bounds: { x: 178, y: 145, w: 32, h: 100 },
+      bounds: { x: 258, y: 145, w: 30, h: 100 },
       nodeIds: ["mcb1_b10_l1"],
       on: false,
       pressed: false,
@@ -547,7 +573,7 @@ export function createPrototypeWorld(): World {
       id: "mcb_1p_b16",
       type: "mcb1p",
       title: "1P B16A",
-      bounds: { x: 214, y: 145, w: 32, h: 100 },
+      bounds: { x: 294, y: 145, w: 30, h: 100 },
       nodeIds: ["mcb1_b16_l1"],
       on: false,
       pressed: false,
@@ -558,7 +584,7 @@ export function createPrototypeWorld(): World {
       id: "dev_impulse",
       type: "impulse_relay",
       title: "Impulzusrelé",
-      bounds: { x: 252, y: 145, w: 58, h: 100 },
+      bounds: { x: 330, y: 145, w: 54, h: 100 },
       nodeIds: ["imp_a1", "imp_a2", "imp_1", "imp_2"],
       on: false,
       relayState: false,
@@ -570,7 +596,7 @@ export function createPrototypeWorld(): World {
       id: "dev_staircase",
       type: "staircase_relay",
       title: "Lépcsőházi aut.",
-      bounds: { x: 316, y: 145, w: 60, h: 100 },
+      bounds: { x: 390, y: 145, w: 56, h: 100 },
       nodeIds: ["stair_n", "stair_b", "stair_l", "stair_4"],
       on: false,
       timerRemaining: 0,
@@ -582,7 +608,7 @@ export function createPrototypeWorld(): World {
       id: "dev_timer",
       type: "timer_relay",
       title: "Időrelé",
-      bounds: { x: 382, y: 145, w: 64, h: 100 },
+      bounds: { x: 452, y: 145, w: 58, h: 100 },
       nodeIds: ["timer_a1", "timer_15", "timer_18", "timer_16", "timer_a2"],
       on: false,
       relayState: false,
@@ -596,7 +622,7 @@ export function createPrototypeWorld(): World {
       id: "dev_motor_protector",
       type: "motor_protector",
       title: "Motorvédő",
-      bounds: { x: 494, y: 145, w: 60, h: 100 },
+      bounds: { x: 590, y: 145, w: 64, h: 100 },
       nodeIds: [
         "mp_in_l1", "mp_in_l2", "mp_in_l3",
         "mp_out_t1", "mp_out_t2", "mp_out_t3",

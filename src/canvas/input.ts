@@ -1,6 +1,6 @@
 import { SNAP_RADIUS, WIRE_SAMPLE_GAP } from "../data/colors";
 import { hitWagoBox, WAGO_BOXES, type WagoBoxDef } from "../data/wagoBoxes";
-import type { Point, Port, ToolMode, WagoBlock, Wire, WireColorId, World } from "../models/types";
+import type { Device, Point, Port, ToolMode, WagoBlock, Wire, WireColorId, World } from "../models/types";
 import { hasWagoWires } from "../models/world";
 
 export { hitWagoBox, WAGO_BOXES, type WagoBoxDef };
@@ -27,6 +27,29 @@ export function hitDevice(world: World, p: Point) {
     const { x, y, w, h } = d.bounds;
     return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
   });
+}
+
+/**
+ * Ellenőrzi, hogy a kattintás egy ÁVK (rcd_3p vagy rcd_1p) "T" tesztgombjára esett-e.
+ */
+export function hitRcdTestButton(world: World, p: Point): Device | undefined {
+  for (const device of world.devices) {
+    if (device.type === "rcd_3p" || device.type === "rcd_1p") {
+      const btnX = device.bounds.x + 10;
+      const btnY = device.bounds.y + 26;
+      const btnW = 24;
+      const btnH = 18;
+      if (
+        p.x >= btnX - 3 &&
+        p.x <= btnX + btnW + 3 &&
+        p.y >= btnY - 3 &&
+        p.y <= btnY + btnH + 3
+      ) {
+        return device;
+      }
+    }
+  }
+  return undefined;
 }
 
 /**
