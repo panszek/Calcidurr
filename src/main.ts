@@ -2,6 +2,7 @@ import "./style.css";
 import { renderWorld } from "./canvas/renderer";
 import {
   cursorFor,
+  hitClampTarget,
   hitColumnLowerHalf,
   hitColumnUpperHalf,
   hitDevice,
@@ -14,9 +15,11 @@ import {
   hitWagoLever,
   hitWagoRotateButton,
   hitWire,
+  hitWorkbenchClamp,
   hitWorkbenchTester,
   nearestPort,
   sampleDraft,
+  syncClampTarget,
   syncProbeTarget,
   type DraftWire,
 } from "./canvas/input";
@@ -25,9 +28,12 @@ import { ColorCheckPanel } from "./canvas/colorCheckPanel";
 import { WIRE_COLORS } from "./data/colors";
 import { createPrototypeWorld } from "./data/prototypeTrack";
 import { checkWireColors } from "./engine/colorCheck";
+import { measureClampCurrent } from "./engine/currentSolver";
 import { measureUniT } from "./engine/measurements";
 import { portPotential, simulate } from "./engine/simulation";
 import type {
+  ClampReading,
+  ClampTarget,
   Point,
   Port,
   ProbeTarget,
@@ -37,7 +43,7 @@ import type {
   WireColorId,
   World,
 } from "./models/types";
-import { InstrumentPanel } from "./ui/instrumentPanel";
+import { ClampMeterPanel, InstrumentPanel } from "./ui/instrumentPanel";
 import {
   addWire,
   hasWagoWires,
@@ -156,10 +162,67 @@ function updateTester() {
   });
 }
 
+// Lakatfogó (AC Clamp Meter) állapot
+let clampedTarget: ClampTarget | undefined;
+let hoverClampTarget: ClampTarget | undefined;
+let clampHoldValue: number | null = null;
+let clampReading: ClampReading = measureClampCurrent(world, sim);
+
+function clearClamp() {
+  clampedTarget = undefined;
+  clampHoldValue = null;
+  updateClamp();
+}
+
+function toggleClampHold() {
+  if (clampHoldValue !== null) {
+    clampHoldValue = null;
+  } else {
+    clampHoldValue = clampReading.liveCurrent;
+  }
+  updateClamp();
+}
+
+const clampPanel = new ClampMeterPanel({
+  onToggleHold: () => {
+    toggleClampHold();
+    draw();
+  },
+  onDetachClamp: () => {
+    clearClamp();
+    draw();
+  },
+  onClose: () => {
+    clampedTarget = undefined;
+    hoverClampTarget = undefined;
+    clampHoldValue = null;
+    if (tool === "clamp") {
+      tool = "hand";
+      paintToolbar();
+    }
+    updateClamp();
+    draw();
+  },
+});
+
+function updateClamp() {
+  clampedTarget = syncClampTarget(world, clampedTarget);
+  const liveClampTarget = !clampedTarget && tool === "clamp" ? hoverClampTarget : undefined;
+  const effectiveWireId = clampedTarget?.wireId ?? liveClampTarget?.wireId;
+  clampReading = measureClampCurrent(world, sim, effectiveWireId, clampHoldValue);
+  clampPanel.update({
+    reading: clampReading,
+    clampedTarget,
+    liveClampTarget,
+    toolActive: tool === "clamp",
+  });
+}
+
 // Panning state
 let isPanning = false;
 let panMoved = false;
 let liftProbesOnClickUp = false;
+let detachClampOnClickUp = false;
 let panStart = { clientX: 0, clientY: 0, ox: 0, oy: 0 };
 let spacePressed = false;
 
@@ -179,6 +242,7 @@ function runSim() {
     colorCheckPanel.update(colorCheckResult);
   }
   updateTester();
+  updateClamp();
   if (sim.shortCircuit) {
     showToast(sim.warnings[0] ?? "Zárlat keletkezett! A kismegszakító leoldott.");
   }
@@ -237,6 +301,7 @@ function paintToolbar() {
     { id: "hand", label: "Kéz / ujj" },
     { id: "cutter", label: "Csípőfogó" },
     { id: "tester", label: "⚡ UNI-T vizsgáló" },
+    { id: "clamp", label: "🧲 Lakatfogó" },
   ];
 
   const colorButtons = (Object.keys(WIRE_COLORS) as WireColorId[])
@@ -336,6 +401,9 @@ function draw() {
     hoverProbeTarget,
     pointerWorldPos,
     testerReading,
+    clampedTarget,
+    hoverClampTarget,
+    clampReading,
   });
 }
 
@@ -354,11 +422,19 @@ canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   if (panMoved) return;
 
-  // Jobb klikk elemeli a mérőtüskéket (különösen UNI-T vizsgáló módban, vagy ha nem WAGO forgatás történik)
+  // Jobb klikk elemeli a mérőtüskéket / lecsatolja a lakatfogót
   const p = eventPoint(e);
+  if (tool === "clamp") {
+    if (clampedTarget || clampHoldValue !== null) {
+      clearClamp();
+      draw();
+    }
+    return;
+  }
   const w = tool !== "tester" ? hitWago(world, p) : undefined;
-  if (!w && (blackProbe || redProbe)) {
-    clearProbes();
+  if (!w && (blackProbe || redProbe || clampedTarget || clampHoldValue !== null)) {
+    if (blackProbe || redProbe) clearProbes();
+    if (clampedTarget || clampHoldValue !== null) clearClamp();
     draw();
     return;
   }
@@ -392,6 +468,7 @@ canvas.addEventListener("pointerdown", (event) => {
     isPanning = true;
     panMoved = false;
     liftProbesOnClickUp = false;
+    detachClampOnClickUp = false;
     panStart = {
       clientX: event.clientX,
       clientY: event.clientY,
@@ -415,9 +492,54 @@ canvas.addEventListener("pointerdown", (event) => {
   if (hitWorkbenchTester(p)) {
     tool = "tester";
     instrumentPanel.show();
+    if (!clampedTarget && clampHoldValue === null) {
+      clampPanel.hide();
+    }
+    updateTester();
+    updateClamp();
+    paintToolbar();
+    draw();
+    return;
+  }
+
+  // Munkapadon lévő Lakatfogóra kattintás aktiválja a lakatfogó módot
+  if (hitWorkbenchClamp(p)) {
+    tool = "clamp";
+    clampPanel.show();
+    if (!blackProbe && !redProbe) {
+      instrumentPanel.hide();
+    }
+    updateClamp();
     updateTester();
     paintToolbar();
     draw();
+    return;
+  }
+
+  // Lakatfogó (AC Clamp Meter) mód kezelése
+  if (tool === "clamp") {
+    const target = hitClampTarget(world, p);
+    if (target) {
+      clampedTarget = target;
+      hoverClampTarget = target;
+      clampHoldValue = null;
+      updateClamp();
+      draw();
+      return;
+    }
+
+    // Üres helyre kattintás: húzás esetén vászonmozgatás (pan), sima kattintásnál lakatfogó lecsatolása
+    isPanning = true;
+    panMoved = false;
+    liftProbesOnClickUp = false;
+    detachClampOnClickUp = !!(clampedTarget || clampHoldValue !== null);
+    panStart = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      ox: view.ox,
+      oy: view.oy,
+    };
+    canvas.style.cursor = "grabbing";
     return;
   }
 
@@ -756,17 +878,36 @@ canvas.addEventListener("pointermove", (event) => {
 
   if (tool === "tester") {
     hoverProbeTarget = hitProbeTarget(world, p);
+    hoverClampTarget = undefined;
     hoverPortId = hoverProbeTarget?.portId;
     hoverWireId = undefined;
     hoveredWagoId = undefined;
     updateTester();
     canvas.style.cursor =
-      hitLegendPoster(p) || hoverProbeTarget ? "pointer" : cursorFor(tool, isPanning);
+      hitLegendPoster(p) || hitWorkbenchClamp(p) || hoverProbeTarget
+        ? "pointer"
+        : cursorFor(tool, isPanning);
+    draw();
+    return;
+  }
+
+  if (tool === "clamp") {
+    hoverClampTarget = hitClampTarget(world, p);
+    hoverProbeTarget = undefined;
+    hoverPortId = undefined;
+    hoverWireId = hoverClampTarget?.wireId;
+    hoveredWagoId = undefined;
+    updateClamp();
+    canvas.style.cursor =
+      hitLegendPoster(p) || hitWorkbenchTester(p) || hoverClampTarget
+        ? "pointer"
+        : cursorFor(tool, isPanning);
     draw();
     return;
   }
 
   hoverProbeTarget = undefined;
+  hoverClampTarget = undefined;
   hoverPortId = (tool === "screwdriver" ? hitScrewdriverTarget(world, p) : nearestPort(world, p))?.id;
   if (!hoverPortId && tool === "wire") {
     const lowerCol = hitColumnLowerHalf(world, p);
@@ -776,7 +917,12 @@ canvas.addEventListener("pointermove", (event) => {
   const hoveredWago = hitWago(world, p);
   hoveredWagoId = hoveredWago?.id;
 
-  if (hitLegendPoster(p) || hitWagoRotateButton(world, p) || hitWorkbenchTester(p)) {
+  if (
+    hitLegendPoster(p) ||
+    hitWagoRotateButton(world, p) ||
+    hitWorkbenchTester(p) ||
+    hitWorkbenchClamp(p)
+  ) {
     canvas.style.cursor = "pointer";
   } else if (tool === "hand") {
     if (hitWagoLever(world, p)) {
@@ -844,11 +990,17 @@ canvas.addEventListener("pointerup", (event) => {
 
   if (isPanning) {
     const shouldLiftProbes = liftProbesOnClickUp && !panMoved;
+    const shouldDetachClamp = detachClampOnClickUp && !panMoved;
     isPanning = false;
     liftProbesOnClickUp = false;
+    detachClampOnClickUp = false;
     canvas.style.cursor = cursorFor(tool);
     if (shouldLiftProbes) {
       clearProbes();
+      draw();
+    }
+    if (shouldDetachClamp) {
+      clearClamp();
       draw();
     }
   }
@@ -902,6 +1054,7 @@ canvas.addEventListener("pointerleave", () => {
   if (isPanning) {
     isPanning = false;
     liftProbesOnClickUp = false;
+    detachClampOnClickUp = false;
   }
   if (draggedWago) {
     draggedWago = undefined;
@@ -909,11 +1062,15 @@ canvas.addEventListener("pointerleave", () => {
   }
   pointerWorldPos = undefined;
   hoverProbeTarget = undefined;
+  hoverClampTarget = undefined;
   hoverPortId = undefined;
   hoverWireId = undefined;
   hoveredWagoId = undefined;
   if (tool === "tester" && blackProbe && !redProbe) {
     updateTester();
+  }
+  if (tool === "clamp" && !clampedTarget) {
+    updateClamp();
   }
   draw();
 });
@@ -921,11 +1078,24 @@ canvas.addEventListener("pointerleave", () => {
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") spacePressed = true;
   if (e.key === "Escape") {
+    let changedAny = false;
     if (blackProbe || redProbe) {
       clearProbes();
+      changedAny = true;
+    }
+    if (clampedTarget || clampHoldValue !== null) {
+      clearClamp();
+      changedAny = true;
+    }
+    if (changedAny) {
       draw();
       return;
     }
+  }
+  if ((e.key === "h" || e.key === "H") && clampPanel.isOpen()) {
+    toggleClampHold();
+    draw();
+    return;
   }
   if (e.key === "r" || e.key === "R") {
     const targetWagoId = draggedWago?.id ?? hoveredWagoId;
@@ -965,7 +1135,13 @@ toolbar.addEventListener("click", (event) => {
     } else if (!blackProbe && !redProbe) {
       instrumentPanel.hide();
     }
+    if (tool === "clamp") {
+      clampPanel.show();
+    } else if (!clampedTarget && clampHoldValue === null) {
+      clampPanel.hide();
+    }
     updateTester();
+    updateClamp();
     paintToolbar();
     draw();
     return;
@@ -1024,8 +1200,14 @@ toolbar.addEventListener("click", (event) => {
     blackProbe = undefined;
     redProbe = undefined;
     hoverProbeTarget = undefined;
+    clampedTarget = undefined;
+    hoverClampTarget = undefined;
+    clampHoldValue = null;
     if (tool !== "tester") {
       instrumentPanel.hide();
+    }
+    if (tool !== "clamp") {
+      clampPanel.hide();
     }
     colorCheckActive = false;
     colorCheckPanel.hide();
@@ -1043,7 +1225,11 @@ toolbar.addEventListener("change", (event) => {
     if (!blackProbe && !redProbe) {
       instrumentPanel.hide();
     }
+    if (!clampedTarget && clampHoldValue === null) {
+      clampPanel.hide();
+    }
     updateTester();
+    updateClamp();
     paintToolbar();
     draw();
   }
@@ -1102,5 +1288,16 @@ draw();
 
 Object.defineProperty(window, "__simApp", {
   configurable: true,
-  get: () => ({ world, sim, tool, debug, blackProbe, redProbe, testerReading }),
+  get: () => ({
+    world,
+    sim,
+    tool,
+    debug,
+    blackProbe,
+    redProbe,
+    testerReading,
+    clampedTarget,
+    clampReading,
+    clampHoldValue,
+  }),
 });

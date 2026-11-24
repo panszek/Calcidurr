@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cursorFor,
   dist,
+  hitClampTarget,
   hitColumnLowerHalf,
   hitColumnUpperHalf,
   hitDevice,
@@ -11,14 +12,17 @@ import {
   hitWago,
   hitWagoLever,
   hitWire,
+  hitWorkbenchClamp,
   hitWorkbenchTester,
   nearestPort,
   sampleDraft,
+  syncClampTarget,
   syncProbeTarget,
+  WORKBENCH_CLAMP_BOUNDS,
   WORKBENCH_TESTER_BOUNDS,
 } from "../canvas/input";
 import { SNAP_RADIUS } from "../data/colors";
-import { moveWago, removeWago, setPortTight, spawnWago } from "../models/world";
+import { moveWago, removeWago, removeWire, setPortTight, spawnWago } from "../models/world";
 import { connectNodes, createTestWorld, portOf } from "./testHelpers";
 
 describe("Canvas input hit-testing & geometry", () => {
@@ -121,10 +125,12 @@ describe("Canvas input hit-testing & geometry", () => {
 
     expect(cursorFor("wire", false)).toBe("crosshair");
     expect(cursorFor("tester", false)).toBe("crosshair");
+    expect(cursorFor("clamp", false)).toBe("crosshair");
     expect(cursorFor("screwdriver", false)).toBe("pointer");
     expect(cursorFor("cutter", false)).toBe("not-allowed");
     expect(cursorFor("hand", false)).toBe("grab");
     expect(cursorFor("wire", true)).toBe("grabbing");
+    expect(cursorFor("clamp", true)).toBe("grabbing");
   });
 
   it("hits UNI-T probe targets on upper/lower terminal screws, WAGOs, motor WAGOs and socket without leaking secret names", () => {
@@ -183,5 +189,40 @@ describe("Canvas input hit-testing & geometry", () => {
 
     removeWago(world, freeWago.id);
     expect(syncProbeTarget(world, synced)).toBeUndefined();
+  });
+
+  it("hits Clamp Meter workbench bounds, projects clamp jaw onto wires without leaking secret names, and syncs removal", () => {
+    const world = createTestWorld();
+
+    expect(
+      hitWorkbenchClamp({
+        x: WORKBENCH_CLAMP_BOUNDS.x + 25,
+        y: WORKBENCH_CLAMP_BOUNDS.y + 40,
+      }),
+    ).toBe(true);
+    expect(hitWorkbenchClamp({ x: 100, y: 100 })).toBe(false);
+
+    const wire = connectNodes(world, "mcb1_b10_l1", "lamp1_l", "L1", true);
+    const midX = (wire.points[0].x + wire.points[1].x) / 2;
+    const midY = (wire.points[0].y + wire.points[1].y) / 2;
+
+    // Kis eltolással a vezeték mellé húzva a pofa pontosan a vezetékre vetül
+    const hit = hitClampTarget(world, { x: midX + 5, y: midY - 4 });
+    expect(hit).toBeDefined();
+    expect(hit?.wireId).toBe(wire.id);
+    expect(hit?.displayLabel).toContain("Fekete vezeték");
+    expect(hit?.displayLabel).toContain("X1/");
+    expect(hit?.displayLabel).toContain("X2/");
+    // Információelrejtés ellenőrzése: nem szivároghat ki "Izzó 1" vagy "1P B10A"!
+    expect(hit?.displayLabel).not.toContain("Izzó");
+    expect(hit?.displayLabel).not.toContain("B10A");
+
+    // Távol a vezetéktől nincs találat
+    expect(hitClampTarget(world, { x: 50, y: 50 })).toBeUndefined();
+
+    // Szinkronizáció: amíg a vezeték él, megtartja; kivágás után lecsatolódik
+    expect(syncClampTarget(world, hit)?.wireId).toBe(wire.id);
+    removeWire(world, wire.id);
+    expect(syncClampTarget(world, hit)).toBeUndefined();
   });
 });

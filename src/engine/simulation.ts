@@ -1,5 +1,6 @@
 import type { MotorState, Potential, SimState, World } from "../models/types";
 import { isWireEndSecure, tripMcb, tripRcd } from "../models/world";
+import { solveWireCurrents } from "./currentSolver";
 
 const LIVE: Potential[] = ["L1", "L2", "L3"];
 
@@ -16,6 +17,7 @@ function emptySim(): SimState {
     activeDevices: new Set(),
     looseCount: 0,
     warnings: [],
+    wireCurrents: {},
   };
 }
 
@@ -172,7 +174,7 @@ function neighborsOf(world: World, energizedContactors: Set<string>): Map<string
   return adj;
 }
 
-function sourceOf(world: World, nodeId: string): { pot: Potential; breakerId?: string; rcdId?: string } {
+export function sourceOf(world: World, nodeId: string): { pot: Potential; breakerId?: string; rcdId?: string } {
   const node = world.nodes[nodeId];
   if (!node?.sourcePotential) return { pot: "none" };
 
@@ -804,6 +806,9 @@ export function simulate(world: World): SimState {
   if (motorState.mode !== "off" && !motorState.peConnected) {
     result.warnings.push("3F Motor: A védővezető (PE) nincs bekötve a motorhoz! Földelés nélkül nem üzemeltethető.");
   }
+
+  // Valós fázor-alapú ágáramok kiszámítása minden vezetékre (lakatfogóhoz)
+  result.wireCurrents = solveWireCurrents(world, result);
 
   return result;
 }

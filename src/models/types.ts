@@ -2,7 +2,7 @@ export type Potential = "none" | "L1" | "L2" | "L3" | "N" | "PE";
 
 export type WireColorId = "L1" | "L2" | "L3" | "N" | "PE" | "CTRL";
 
-export type ToolMode = "wire" | "screwdriver" | "hand" | "cutter" | "tester";
+export type ToolMode = "wire" | "screwdriver" | "hand" | "cutter" | "tester" | "clamp";
 
 export type PortKind = "screw" | "wago";
 
@@ -148,6 +148,7 @@ export interface SimState {
   looseCount: number;
   warnings: string[];
   motor?: MotorState;
+  wireCurrents: Record<string, number>;
 }
 
 export type MotorMode = "off" | "star" | "delta" | "phase_fault";
@@ -231,6 +232,39 @@ export interface TesterReading {
   blackPotential: Potential;
   /** Piros (+) tüske potenciálja */
   redPotential: Potential;
+}
+
+export interface ClampTarget {
+  wireId: string;
+  x: number;
+  y: number;
+  /** A vezeték érintőszöge radiánban az adott szakaszon */
+  angle: number;
+  /** Szakasz indexe a wire.points tömbben */
+  segIndex: number;
+  /** Relatív pozíció a szakaszon belül (0..1) */
+  segT: number;
+  /** Információelrejtést tisztelő fizikai megnevezés a lakatfogó panelen */
+  displayLabel: string;
+}
+
+export interface ClampReading {
+  /** Igaz, ha a lakatfogó pofája vezetéket fog közre (élő hover vagy rögzített) */
+  hasWire: boolean;
+  /** Pillanatnyi effektív váltakozó áram a vezetéken (A AC) */
+  liveCurrent: number;
+  /** Kijelzett áramerősség (HOLD esetén a rögzített érték, különben liveCurrent) */
+  displayCurrent: number;
+  /** DATA HOLD aktív-e */
+  hold: boolean;
+  /** A pofában lévő vezeték feszültség alatt áll-e (⚡ jelzéshez) */
+  isLiveWire: boolean;
+  /** Magas áram / fázishiba figyelmeztetés (>= 6.0 A) */
+  overloadWarn: boolean;
+  /** Elsődleges LCD kijelzés (pl. "0.43 A", "5.40 A", "0.00 A") */
+  lcdPrimary: string;
+  /** Másodlagos LCD státuszsor */
+  lcdSecondary: string;
 }
 
 

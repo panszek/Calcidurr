@@ -1198,3 +1198,343 @@ body,
   color: #94a3b8;
   text-align: center;
 }
+
+/* =========================================================================
+   UNI-T UT202A+ DIGITÁLIS LAKATFOGÓ (AC CLAMP METER) LEBEGŐ MŰSZERPANEL
+   ========================================================================= */
+
+.clamp-panel-container {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 288px;
+  max-width: calc(100vw - 36px);
+  z-index: 116;
+  user-select: none;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  animation: fadeInPanel 0.2s ease-out;
+}
+
+.clamp-panel-container.hidden {
+  display: none !important;
+}
+
+.clamp-holster {
+  background: linear-gradient(160deg, #f59e0b 0%, #d97706 52%, #b45309 100%);
+  border: 2px solid #fbbf24;
+  border-radius: 18px;
+  padding: 8px;
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.72),
+    inset 0 1px 1px rgba(255, 255, 255, 0.32);
+}
+
+.clamp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 8px 8px;
+  cursor: grab;
+}
+
+.clamp-header:active {
+  cursor: grabbing;
+}
+
+.clamp-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.clamp-logo-badge {
+  background: #b91c1c;
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 11.5px;
+  letter-spacing: 1px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.clamp-model-code {
+  font-size: 12.5px;
+  font-weight: 900;
+  color: #111827;
+  letter-spacing: 0.4px;
+}
+
+.clamp-sub-badge {
+  background: rgba(17, 24, 39, 0.85);
+  color: #fde68a;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1.5px 6px;
+  border-radius: 99px;
+}
+
+.clamp-close-btn {
+  appearance: none;
+  border: 1px solid rgba(17, 24, 39, 0.35);
+  background: rgba(17, 24, 39, 0.72);
+  color: #ffffff;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.clamp-close-btn:hover {
+  background: #111827;
+}
+
+.clamp-faceplate {
+  background: linear-gradient(180deg, #1e2430 0%, #131720 100%);
+  border: 1.5px solid #0f172a;
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.clamp-led-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0d1117;
+  border: 1px solid #263042;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.clamp-sled {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.3px;
+}
+
+.clamp-led-dot {
+  width: 8.5px;
+  height: 8.5px;
+  border-radius: 99px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  transition: all 0.1s ease;
+}
+
+.clamp-sled.ac.on {
+  color: #6ee7b7;
+}
+
+.clamp-sled.ac.on .clamp-led-dot {
+  background: #10b981;
+  border-color: #a7f3d0;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.clamp-sled.hold.on {
+  color: #fde047;
+}
+
+.clamp-sled.hold.on .clamp-led-dot {
+  background: #facc15;
+  border-color: #fef08a;
+  box-shadow: 0 0 9px #facc15;
+}
+
+.clamp-sled.over.on {
+  color: #fca5a5;
+}
+
+.clamp-sled.over.on .clamp-led-dot {
+  background: #ef4444;
+  border-color: #fecaca;
+  box-shadow: 0 0 10px #ef4444;
+}
+
+.clamp-lcd {
+  background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+  color: #0f172a;
+  border: 2px solid #090d14;
+  border-radius: 7px;
+  padding: 6px 9px 7px 9px;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.clamp-lcd.lcd-active {
+  background: linear-gradient(180deg, #bae6fd 0%, #7dd3fc 100%);
+  color: #082f49;
+}
+
+.clamp-lcd.lcd-hold {
+  background: linear-gradient(180deg, #fef08a 0%, #fde047 100%);
+  color: #422006;
+}
+
+.clamp-lcd.lcd-overload {
+  background: linear-gradient(180deg, #fecaca 0%, #fca5a5 100%);
+  color: #450a0a;
+}
+
+.clamp-lcd-icons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 9.5px;
+  font-weight: 900;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.14);
+  padding-bottom: 2px;
+  margin-bottom: 3px;
+}
+
+.clamp-lcd-icons .lcd-seg {
+  opacity: 0.18;
+  transition: opacity 0.08s ease;
+}
+
+.clamp-lcd-icons .lcd-seg.on {
+  opacity: 1;
+}
+
+.clamp-lcd-primary {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: right;
+  letter-spacing: 1px;
+}
+
+.clamp-bargraph {
+  display: grid;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 2px;
+  margin: 5px 0 3px 0;
+  padding: 2px 0;
+  border-top: 1px dashed rgba(0, 0, 0, 0.18);
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.18);
+}
+
+.clamp-bar-seg {
+  height: 5px;
+  border-radius: 1px;
+  background: rgba(15, 23, 42, 0.14);
+  transition: background 0.08s ease;
+}
+
+.clamp-bar-seg.on {
+  background: #0f172a;
+}
+
+.clamp-bar-seg.high.on {
+  background: #b91c1c;
+}
+
+.clamp-lcd-secondary {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: right;
+  opacity: 0.88;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clamp-target-box {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #0d1117;
+  border: 1px solid #263042;
+  border-radius: 7px;
+  padding: 6px 8px;
+}
+
+.clamp-jaw-badge {
+  font-size: 9.5px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #78350f;
+  color: #fde68a;
+  border: 1px solid #d97706;
+  flex-shrink: 0;
+}
+
+.clamp-target-text {
+  color: #94a3b8;
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clamp-target-text.pinned {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.clamp-target-text.live {
+  color: #fde047;
+  font-weight: 700;
+}
+
+.clamp-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.clamp-btn {
+  appearance: none;
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clamp-btn:hover:not(:disabled) {
+  background: #334155;
+  color: #ffffff;
+}
+
+.clamp-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.clamp-btn.hold-btn.active {
+  background: #78350f;
+  border-color: #f59e0b;
+  color: #fef08a;
+}
+
+.clamp-footer-hint {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #1f2937;
+  padding-top: 6px;
+}

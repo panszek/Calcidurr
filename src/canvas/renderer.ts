@@ -1,10 +1,12 @@
 import { MARK_FILL, WIRE_COLORS } from "../data/colors";
 import { UPPER_TERMINAL_GROUPS, LOWER_TERMINAL_GROUPS } from "../data/terminalLegend";
 import { WAGO_BOXES } from "../data/wagoBoxes";
-import { WORKBENCH_TESTER_BOUNDS } from "./input";
+import { WORKBENCH_CLAMP_BOUNDS, WORKBENCH_TESTER_BOUNDS } from "./input";
 import { isWireLive } from "../engine/simulation";
 import { hasWagoWires, isWireEndSecure } from "../models/world";
 import type {
+  ClampReading,
+  ClampTarget,
   Device,
   Point,
   Port,
@@ -36,6 +38,9 @@ export interface RenderExtras {
   hoverProbeTarget?: ProbeTarget;
   pointerWorldPos?: Point;
   testerReading?: TesterReading;
+  clampedTarget?: ClampTarget;
+  hoverClampTarget?: ClampTarget;
+  clampReading?: ClampReading;
 }
 
 function roundRect(
@@ -2011,6 +2016,410 @@ function drawWorkbenchTester(ctx: CanvasRenderingContext2D, extras: RenderExtras
   ctx.restore();
 }
 
+function drawWorkbenchClampMeter(ctx: CanvasRenderingContext2D, extras: RenderExtras) {
+  const b = WORKBENCH_CLAMP_BOUNDS;
+  const reading = extras.clampReading;
+  const isClampTool = extras.tool === "clamp";
+  const isClampedOnBoard = !!extras.clampedTarget;
+
+  ctx.save();
+  if (isClampedOnBoard && !isClampTool) {
+    ctx.globalAlpha = 0.62;
+  }
+
+  // Aktív kijelölési keret lakatfogó módban
+  if (isClampTool) {
+    ctx.save();
+    roundRect(ctx, b.x - 4, b.y - 4, b.w + 8, b.h + 8, 14);
+    ctx.strokeStyle = "rgba(251, 191, 36, 0.85)";
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([5, 3]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  const cx = b.x + b.w / 2;
+
+  // 1. Felső lakatfogó transzformátorpofa (teardrop pincer jaws)
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+
+  // Bal pofaív
+  ctx.beginPath();
+  ctx.moveTo(cx - 14, b.y + 46);
+  ctx.bezierCurveTo(cx - 26, b.y + 34, cx - 23, b.y + 6, cx - 2, b.y + 2);
+  ctx.lineTo(cx - 1, b.y + 10);
+  ctx.bezierCurveTo(cx - 13, b.y + 13, cx - 14, b.y + 32, cx - 6, b.y + 44);
+  ctx.closePath();
+  ctx.fillStyle = "#dc2626";
+  ctx.fill();
+  ctx.strokeStyle = "#7f1d1d";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Jobb pofaív
+  ctx.beginPath();
+  ctx.moveTo(cx + 14, b.y + 46);
+  ctx.bezierCurveTo(cx + 26, b.y + 34, cx + 23, b.y + 6, cx + 2, b.y + 2);
+  ctx.lineTo(cx + 1, b.y + 10);
+  ctx.bezierCurveTo(cx + 13, b.y + 13, cx + 14, b.y + 32, cx + 6, b.y + 44);
+  ctx.closePath();
+  ctx.fillStyle = "#dc2626";
+  ctx.fill();
+  ctx.strokeStyle = "#7f1d1d";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Fémes pofacsúcs illesztés
+  ctx.fillStyle = "#94a3b8";
+  ctx.fillRect(cx - 2, b.y + 2, 4, 8);
+  ctx.restore();
+
+  // Oldalsó pofanyitó ravasz (trigger lever) a bal oldalon
+  roundRect(ctx, b.x + 3, b.y + 50, 9, 24, 3);
+  ctx.fillStyle = "#dc2626";
+  ctx.fill();
+  ctx.strokeStyle = "#7f1d1d";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // 2. Sárga-borostyán ipari lakatfogó készülékház
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+  ctx.shadowBlur = 9;
+  ctx.shadowOffsetY = 4;
+  roundRect(ctx, b.x + 9, b.y + 42, b.w - 14, b.h - 42, 11);
+  ctx.fillStyle = "#d97706";
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = isClampTool ? "#fde047" : "#92400e";
+  ctx.lineWidth = isClampTool ? 2.2 : 1.4;
+  roundRect(ctx, b.x + 9, b.y + 42, b.w - 14, b.h - 42, 11);
+  ctx.stroke();
+
+  // Belső antracit előlap
+  const fx = b.x + 14;
+  const fy = b.y + 47;
+  const fw = b.w - 24;
+  const fh = b.h - 52;
+  roundRect(ctx, fx, fy, fw, fh, 7);
+  ctx.fillStyle = "#181d27";
+  ctx.fill();
+  ctx.strokeStyle = "#0f172a";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Típusjelzés
+  ctx.fillStyle = "#fde68a";
+  ctx.font = "900 7.5px Segoe UI, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("UT202A+ ~A", fx + fw / 2, fy + 11);
+
+  // Forgókapcsoló tárcsa (~A állásban)
+  const dialCx = fx + fw / 2;
+  const dialCy = fy + 29;
+  ctx.beginPath();
+  ctx.arc(dialCx, dialCy, 11.5, 0, Math.PI * 2);
+  ctx.fillStyle = "#334155";
+  ctx.fill();
+  ctx.strokeStyle = "#0f172a";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  ctx.save();
+  ctx.translate(dialCx, dialCy);
+  ctx.rotate(-0.55);
+  roundRect(ctx, -2.5, -9.5, 5, 19, 2);
+  ctx.fillStyle = "#f59e0b";
+  ctx.fill();
+  ctx.restore();
+
+  // Háttérvilágításos mini LCD kijelző
+  const lcdX = fx + 5;
+  const lcdY = fy + 46;
+  const lcdW = fw - 10;
+  const lcdH = 24;
+  const overload = !!reading?.overloadWarn;
+  const hold = !!reading?.hold;
+  const hasAmp = (reading?.displayCurrent ?? 0) > 0;
+
+  roundRect(ctx, lcdX, lcdY, lcdW, lcdH, 3);
+  ctx.fillStyle = overload
+    ? "#fca5a5"
+    : hold
+      ? "#fde047"
+      : hasAmp
+        ? "#7dd3fc"
+        : "#cbd5e1";
+  ctx.fill();
+  ctx.strokeStyle = "#090d14";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "900 9.5px monospace";
+  ctx.textAlign = "right";
+  ctx.fillText(reading?.lcdPrimary ?? "0.00 A", lcdX + lcdW - 3, lcdY + 16);
+
+  // Alsó felirat
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "800 6.5px Segoe UI, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("LAKATFOGÓ", fx + fw / 2, fy + fh - 5);
+
+  ctx.restore();
+}
+
+function clampBodyDirection(wireAngle: number): number {
+  const n1 = wireAngle + Math.PI / 2;
+  const n2 = wireAngle - Math.PI / 2;
+  // Mindig lefelé / jobbra nézzen a lakatfogó nyele, hogy kényelmesen olvasható legyen
+  const score1 = Math.sin(n1) + 0.35 * Math.cos(n1);
+  const score2 = Math.sin(n2) + 0.35 * Math.cos(n2);
+  return score1 >= score2 ? n1 : n2;
+}
+
+/**
+ * A vezeték ALÁ kerülő hátsó lakatfogó pofaszár + vezeték-kiemelés,
+ * hogy a vezeték vizuálisan térben áthaladjon a zárt pofa gyűrűjén.
+ */
+function drawClampUnderlay(
+  ctx: CanvasRenderingContext2D,
+  world: World,
+  extras: RenderExtras,
+) {
+  const activeTarget =
+    extras.clampedTarget ?? (extras.tool === "clamp" ? extras.hoverClampTarget : undefined);
+  if (!activeTarget) return;
+
+  const wire = world.wires.find((w) => w.id === activeTarget.wireId);
+  if (wire && wire.points.length >= 2) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(wire.points[0].x, wire.points[0].y);
+    for (let i = 1; i < wire.points.length; i++) {
+      ctx.lineTo(wire.points[i].x, wire.points[i].y);
+    }
+    ctx.lineWidth = 11;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = extras.clampedTarget
+      ? "rgba(251, 191, 36, 0.38)"
+      : "rgba(56, 189, 248, 0.42)";
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Hátsó (alsó) pofaív a vezeték alatt
+  const bodyDir = clampBodyDirection(activeTarget.angle);
+  ctx.save();
+  ctx.translate(activeTarget.x, activeTarget.y);
+  ctx.rotate(bodyDir);
+
+  ctx.beginPath();
+  ctx.moveTo(20, 5);
+  ctx.bezierCurveTo(10, 22, -14, 22, -19, 1);
+  ctx.lineTo(-12, 1);
+  ctx.bezierCurveTo(-9, 13, 8, 13, 16, 3);
+  ctx.closePath();
+  ctx.fillStyle = "#991b1b";
+  ctx.fill();
+  ctx.strokeStyle = "#450a0a";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * A vezeték FÖLÉ kerülő elülső lakatfogó pofaszár, készüléktest és élő Amper kijelző.
+ */
+function drawClampOverlay(ctx: CanvasRenderingContext2D, extras: RenderExtras) {
+  // Ha már van rögzített lakatfogó, de lakatfogó módban másik vezeték fölé visszük az egeret,
+  // finom szaggatott célgyűrű jelzi az új befogási pontot
+  if (
+    extras.tool === "clamp" &&
+    extras.clampedTarget &&
+    extras.hoverClampTarget &&
+    extras.hoverClampTarget.wireId !== extras.clampedTarget.wireId
+  ) {
+    const ht = extras.hoverClampTarget;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(ht.x, ht.y, 15, 0, Math.PI * 2);
+    ctx.strokeStyle = "#38bdf8";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  const activeTarget =
+    extras.clampedTarget ?? (extras.tool === "clamp" ? extras.hoverClampTarget : undefined);
+  const pinned = !!extras.clampedTarget;
+
+  // Ha nincs vezetéken, csak lakatfogó módban a kurzornál rajzolunk nyitott pofás előnézetet
+  const inWorkbenchZone =
+    extras.pointerWorldPos && extras.pointerWorldPos.y >= 1070;
+  if (!activeTarget && (extras.tool !== "clamp" || !extras.pointerWorldPos || inWorkbenchZone)) {
+    return;
+  }
+
+  const pos = activeTarget ?? extras.pointerWorldPos!;
+  const bodyDir = activeTarget ? clampBodyDirection(activeTarget.angle) : Math.PI * 0.38;
+  const jawsClosed = !!activeTarget;
+  const jawOpenAngle = jawsClosed ? 0 : 0.36;
+  const reading = extras.clampReading;
+
+  ctx.save();
+  ctx.globalAlpha = jawsClosed ? 1 : 0.86;
+  ctx.translate(pos.x, pos.y);
+  ctx.rotate(bodyDir);
+
+  // Ha nyitott pofával a levegőben van, itt rajzoljuk meg az alsó nyitott pofaszárat is
+  if (!jawsClosed) {
+    ctx.save();
+    ctx.translate(18, 5);
+    ctx.rotate(jawOpenAngle);
+    ctx.translate(-18, -5);
+    ctx.beginPath();
+    ctx.moveTo(20, 5);
+    ctx.bezierCurveTo(10, 22, -14, 22, -19, 1);
+    ctx.lineTo(-12, 1);
+    ctx.bezierCurveTo(-9, 13, 8, 13, 16, 3);
+    ctx.closePath();
+    ctx.fillStyle = "#b91c1c";
+    ctx.fill();
+    ctx.strokeStyle = "#450a0a";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Fémes pofavég
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(-19, 0, 7, 2.5);
+    ctx.restore();
+  }
+
+  // Elülső (felső) pofaszár — a vezeték FÖLÖTT zár át, bezárva a gyűrűt!
+  ctx.save();
+  if (!jawsClosed) {
+    ctx.translate(18, -5);
+    ctx.rotate(-jawOpenAngle);
+    ctx.translate(-18, 5);
+  }
+  ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+  ctx.shadowBlur = 5;
+  ctx.shadowOffsetY = 2;
+  ctx.beginPath();
+  ctx.moveTo(20, -5);
+  ctx.bezierCurveTo(10, -22, -14, -22, -19, -1);
+  ctx.lineTo(-12, -1);
+  ctx.bezierCurveTo(-9, -13, 8, -13, 16, -3);
+  ctx.closePath();
+  ctx.fillStyle = "#ef4444";
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#7f1d1d";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Fémes vasmag illesztési csúcs a pofa orránál
+  ctx.fillStyle = "#e2e8f0";
+  ctx.fillRect(-19, -2.2, 7.2, jawsClosed ? 4.4 : 2.2);
+  if (jawsClosed) {
+    ctx.strokeStyle = "#334155";
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(-19, 0);
+    ctx.lineTo(-11.8, 0);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Pofanyitó ravasz (benyomva, ha nyitott a pofa)
+  const trigOffset = jawsClosed ? 0 : 3.5;
+  roundRect(ctx, 24, -22 + trigOffset, 18, 7, 2.5);
+  ctx.fillStyle = "#dc2626";
+  ctx.fill();
+  ctx.strokeStyle = "#7f1d1d";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Ujjvédő gallér és kompakt lakatfogó markolat (x = 17..88)
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.42)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+  roundRect(ctx, 17, -16, 72, 32, 8);
+  ctx.fillStyle = "#d97706";
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = pinned ? "#fde047" : "#78350f";
+  ctx.lineWidth = pinned ? 2 : 1.3;
+  roundRect(ctx, 17, -16, 72, 32, 8);
+  ctx.stroke();
+
+  // Belső sötét előlap a kézi fejen
+  roundRect(ctx, 22, -12, 62, 24, 5);
+  ctx.fillStyle = "#181d27";
+  ctx.fill();
+
+  // Mini forgókapcsoló jelzés
+  ctx.beginPath();
+  ctx.arc(33, 0, 6.5, 0, Math.PI * 2);
+  ctx.fillStyle = "#334155";
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(29, -3);
+  ctx.lineTo(37, 3);
+  ctx.strokeStyle = "#f59e0b";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Vízszintes (mindig olvasható!) LCD érték-címke a lakatfogó fején / mellett
+  if (jawsClosed && reading) {
+    const labelDist = 56;
+    const lx = pos.x + Math.cos(bodyDir) * labelDist;
+    const ly = pos.y + Math.sin(bodyDir) * labelDist;
+
+    const pillText = reading.hold ? `HOLD ${reading.lcdPrimary}` : reading.lcdPrimary;
+    ctx.save();
+    ctx.font = "900 11px Consolas, monospace";
+    const textW = ctx.measureText(pillText).width;
+    const pw = Math.max(58, textW + (pinned ? 26 : 14));
+    const ph = 22;
+
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 2;
+    roundRect(ctx, lx - pw / 2, ly - ph / 2, pw, ph, 5);
+    ctx.fillStyle = reading.overloadWarn
+      ? "#fecaca"
+      : reading.hold
+        ? "#fef08a"
+        : reading.displayCurrent > 0
+          ? "#bae6fd"
+          : "#e2e8f0";
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = pinned ? "#f59e0b" : "#0f172a";
+    ctx.lineWidth = pinned ? 2 : 1.3;
+    ctx.stroke();
+
+    ctx.fillStyle = reading.overloadWarn ? "#7f1d1d" : "#0f172a";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(pinned ? `📌 ${pillText}` : pillText, lx, ly + 0.5);
+    ctx.restore();
+  }
+}
+
 function drawSingleProbe(
   ctx: CanvasRenderingContext2D,
   tip: Point,
@@ -2195,9 +2604,10 @@ export function renderWorld(
     }
   }
 
-  // Draw WAGO dispenser boxes and UNI-T tester on the workbench
+  // Draw WAGO dispenser boxes, UNI-T tester and Clamp Meter on the workbench
   drawWagoBoxes(ctx, world, extras);
   drawWorkbenchTester(ctx, extras);
+  drawWorkbenchClampMeter(ctx, extras);
 
   for (const wago of world.wagos) {
     drawWago(ctx, world, wago, extras.hoverPortId, extras.hoverWagoId, extras.draggedWagoId);
@@ -2205,6 +2615,9 @@ export function renderWorld(
 
   // Devices
   drawDevices(ctx, world, sim, extras);
+
+  // Lakatfogó hátsó pofaszára (a vezetékek alá kerül a valós térbeli átfűzéshez)
+  drawClampUnderlay(ctx, world, extras);
 
   // Wires
   for (const wire of world.wires) {
@@ -2279,8 +2692,9 @@ export function renderWorld(
     }
   }
 
-  // UNI-T mérőtüskék és mérőzsinórok
+  // UNI-T mérőtüskék, mérőzsinórok és Lakatfogó elülső pofája / kijelzője
   drawTesterProbes(ctx, extras);
+  drawClampOverlay(ctx, extras);
 
   // Debug overlay
   if (extras.debug) {

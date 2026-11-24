@@ -13,6 +13,7 @@ Legyen egy eszköztár a következő módokkal:
   - Kapcsolók, nyomógombok és kismegszakítók működtetése (nyomás/billentés).
 - **Csípőfogó eszköz:** Vezeték törlése (csak akkor engedélyezett, ha a vezeték mindkét végén ki van lazítva a csavar / nyitva van a Wago).
 - **UNI-T vizsgáló eszköz (`⚡ UNI-T vizsgáló`):** Kétpólusú feszültség-, fázissorrend- és folytonosságvizsgáló (UNI-T UT18D mintára) fekete (`COM / −`) és piros (`+`) mérőtüskékkel, lebegő digitális/LED műszerpanellel és némítható Web Audio API sípoló hangjelzéssel.
+- **Lakatfogó eszköz (`🧲 Lakatfogó`):** Vezetékre rázáródó digitális váltakozóáramú lakatfogó (UNI-T UT202A+ mintára) valós komplex fázor ágáram-számítással, vezetéken rögzíthető pofával, valamint szabadon mozgatható lebegő LCD műszerpanellel (`~ AC A`, analóg sávkijelző, `DATA HOLD`, lecsatolás).
 
 ## 2. Információelrejtés és Hibakereső (Debug) mód
 - **Normál mód (alapértelmezett):** A sorkapcsok fölé víve az egeret **NEM jelenik meg semmilyen súgószöveg**! A felhasználónak csak a sorkapocs számozása és az alatta lévő gyári színkód-négyzetek (fekete, kék, zöld-sárga, piros) segítenek.
@@ -47,11 +48,12 @@ A kód a következő modulokra oszlik (Vite + TypeScript, böngészőben Canvas)
   - `simulation.ts` — gráfépítés, BFS potenciálterjesztés, zárlat, fogyasztók, MK iteráció, 3F motor.
   - `colorCheck.ts` — szabványos kábelszín validáció (Fekete / Kék / Zöld-sárga).
   - `measurements.ts` — UNI-T kétpólusú feszültségmérés (`230V` / `400V` / `0V`), fázissorrend (`R`/`L`), egypólusú fázisjelzés és BFS folytonosságvizsgálat (`0.0 Ω` / `OL`).
+  - `currentSolver.ts` — Kirchhoff csomóponti komplex fázor áramhálózat-megoldó (`wireCurrents`) és lakatfogó mérési logika (`DATA HOLD`, túláram-jelzés).
 - `src/ui/` — lebegő műszerfalak és vezérlőpanelek.
-  - `instrumentPanel.ts` — mozgatható lebegő UNI-T UT18D műszerpanel + Web Audio API piezo folytonossági hangjelző.
+  - `instrumentPanel.ts` — mozgatható lebegő UNI-T UT18D feszültségvizsgáló panel (Web Audio API sípolóval) és UNI-T UT202A+ digitális lakatfogó panel (`AC A`, bargraph, `HOLD`).
 - `src/canvas/` — megjelenítés és egérkezelés.
-  - `renderer.ts` — sorkapocs, Wago, készülékek, 3F motor, vezeték, UNI-T mérőtüskék/mérőzsinórok, debug overlay.
-  - `input.ts` — mágneses tapadás, szabadkézi vonal, eszközök és mérőtüskék hittestje.
+  - `renderer.ts` — sorkapocs, Wago, készülékek, 3F motor, vezeték, UNI-T mérőtüskék/mérőzsinórok, térbeli lakatfogó pofa, debug overlay.
+  - `input.ts` — mágneses tapadás, szabadkézi vonal, eszközök, mérőtüskék és lakatfogó vezeték-vetítés hittestje.
   - `legendTable.ts`, `colorCheckPanel.ts` — sorkapocs-kiosztási táblázat és színhiba-panel.
 - `src/data/` — pályaadatok.
   - `colors.ts` — vezeték- és jelölőszínek.
@@ -59,7 +61,7 @@ A kód a következő modulokra oszlik (Vite + TypeScript, böngészőben Canvas)
   - `terminalLegend.ts`, `wagoBoxes.ts` — jegyzékcsoportok és munkapadi WAGO dobozok.
 - `src/__tests__/` — Vitest automatizált unit és szimulációs regressziós tesztek (`npm test`).
   - `testHelpers.ts` — újrahasznosítható bekötő és tápkapcsoló segédfüggvények.
-  - `world.test.ts`, `simulation.test.ts`, `input.test.ts`, `prototypeTrack.test.ts`, `wago.test.ts`, `rcd.test.ts`, `motor.test.ts`, `colorCheck.test.ts`, `measurements.test.ts` — világmutációk, áramköri szimuláció, ÁVK-k, 3F motor, színellenőrzés, UNI-T mérések és Canvas hit-testek ellenőrzése.
+  - `world.test.ts`, `simulation.test.ts`, `input.test.ts`, `prototypeTrack.test.ts`, `wago.test.ts`, `rcd.test.ts`, `motor.test.ts`, `colorCheck.test.ts`, `measurements.test.ts`, `currentSolver.test.ts` — világmutációk, áramköri szimuláció, ÁVK-k, 3F motor, színellenőrzés, UNI-T mérések, fázor ágáramok és Canvas hit-testek ellenőrzése.
 
 ## 6. Vizuális referenciák
 A `sources/` mappa a valós oktatófalat dokumentálja:
@@ -218,4 +220,19 @@ A prototípus validációja és a valós fotó (`sources/sorkapocs_kiosztas.png`
   - **Egypólusú fázisjelzés (`⚡` LED):** világít, amint bármelyik mérőtüske élő fázist (`L1/L2/L3`) érint.
   - **Folytonosságvizsgálat (`0.0 Ω` / `OL` + sípolás):** kizárólag feszültségmentes pontok között aktív (feszültség alatt nem csipog). Kikapcsolt kismegszakítóknál is ellenőrzi a fémes összeköttetést meghúzott vezetékeken és zárt érintkezőkön át; folytonosságnál `0.0 Ω`, `🔊 Rx` LED és némítható **Web Audio API** sípoló hang jelzi az áramutat.
 - **Lebegő UNI-T UT18D műszerpanel:** szabadon mozgatható (draggable) panel `12V / 24V / 50V / 120V / 230V / 400V` LED sávval, `⚡ FÁZIS`, `~ AC`, `🔊 Rx` és `L / R` LED-ekkel, kétszínű háttérvilágításos LCD kijelzővel, némítás és tüske-levétel vezérlőkkel.
+
+### 8.9. Digitális Lakatfogó (UNI-T UT202A+) és Fázor Áramhálózat-megoldó:
+- **Fázor-alapú csomóponti árammegoldó (`src/engine/currentSolver.ts`):**
+  - Komplex csomóponti admittanciamátrix (`L1: 230V ∠ 0°`, `L2: 230V ∠ -120°`, `L3: 230V ∠ +120°`, `N` és `PE`: `0V`) és Gauss-elimináció segítségével minden bekötött vezetéken kiszámítja a valós effektív váltakozó áramot (`SimState.wireCurrents`).
+  - **Fogyasztók névleges áramfelvételei:**
+    - Izzó (100 W): `~0.43 A` (párhuzamosan kötve a közös főágon és nullán `0.86 A` / `1.29 A`, az egyedi leágazásokon `0.43 A`).
+    - Mágneskapcsoló tekercs (`A1–A2`): `~0.05 A`.
+    - Impulzusrelé, lépcsőházi automata, időrelé és mozgásérzékelő (PIR): `~0.02 A`.
+    - 3F villanymotor: álló `0.00 A`, Csillag (`Y`) üzem `~1.80 A`, Delta (`Δ`) vonali áram `~5.40 A` (delta tekercság `~3.12 A`), 2-fázisú fázishiba `~8.50 A`.
+  - **Fizikai tulajdonságok:** kiegyensúlyozott 3-fázisú terhelés közös nullavezetőjén `0.00 A` (2 aktív fázisnál vektoriálisan `0.43 A`); nyitott áramkörben, laza csavarnál, nyitott WAGO karnál és `PE` védővezetőn `0.00 A`.
+- **Lakatfogó használata (`ToolMode = "clamp"`):**
+  - Aktiválható a felső eszköztár `🧲 Lakatfogó` gombjával vagy az alsó munkapadon lévő lakatfogóra kattintva.
+  - Vezeték fölé húzva a nyitott lakatfogó pofa térben rázár a vezetékre és azonnal mutatja az élő áramerősséget; kattintással a pofa rögzül a vezetéken (`📌`), így **Kéz** vagy **Csavarhúzó** eszközre váltva kapcsolgatás közben is élőben figyelhető az áramváltozás.
+  - **Információelrejtés védelme:** gyakorló módban a vezetéknél kizárólag a szigetelés színe és a fizikai végpontok (`X1/..`, `X2/..`, WAGO típus) jelennek meg, a rejtett kapocsfunkció nem szivárog ki.
+  - **Lebegő UNI-T UT202A+ műszerpanel:** szabadon mozgatható panel (az UNI-T UT18D feszültségvizsgálóval párhuzamosan is nyitva tartható) `~ AC A`, `HOLD` és `MAX!` LED-ekkel, háttérvilágításos LCD kijelzővel, 20 szegmenses analóg sávkijelzővel, `⏸ HOLD` (`H` gyorsbillentyű) érték-kimerevítéssel és `⏏ Lecsatolás` (`Esc` / jobb klikk) vezérlővel.
 

@@ -1,6 +1,7 @@
-import { SNAP_RADIUS, WIRE_SAMPLE_GAP } from "../data/colors";
+import { SNAP_RADIUS, WIRE_COLORS, WIRE_SAMPLE_GAP } from "../data/colors";
 import { hitWagoBox, WAGO_BOXES, type WagoBoxDef } from "../data/wagoBoxes";
 import type {
+  ClampTarget,
   Device,
   Point,
   Port,
@@ -24,6 +25,18 @@ export const WORKBENCH_TESTER_BOUNDS = {
 
 export function hitWorkbenchTester(p: Point): boolean {
   const b = WORKBENCH_TESTER_BOUNDS;
+  return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+}
+
+export const WORKBENCH_CLAMP_BOUNDS = {
+  x: 842,
+  y: 1086,
+  w: 86,
+  h: 140,
+} as const;
+
+export function hitWorkbenchClamp(p: Point): boolean {
+  const b = WORKBENCH_CLAMP_BOUNDS;
   return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
 }
 
@@ -255,7 +268,7 @@ export function sampleDraft(points: Point[], next: Point): Point[] {
 
 export function cursorFor(tool: ToolMode, isPanning = false): string {
   if (isPanning) return "grabbing";
-  if (tool === "wire" || tool === "tester") return "crosshair";
+  if (tool === "wire" || tool === "tester" || tool === "clamp") return "crosshair";
   if (tool === "screwdriver") return "pointer";
   if (tool === "cutter") return "not-allowed";
   return "grab";
@@ -452,6 +465,114 @@ export function syncProbeTarget(
     }
   }
   return target;
+}
+
+function formatPortAnonymousEndpoint(world: World, portId: string): string {
+  let upperIdx = 0;
+  let lowerIdx = 0;
+  for (const col of world.columns) {
+    const isUpper = col.y < 320;
+    const idx = isUpper ? ++upperIdx : ++lowerIdx;
+    if (col.portId === portId) {
+      return isUpper ? `X1/${idx}` : `X2/${idx}`;
+    }
+  }
+
+  for (const wago of world.wagos) {
+    if (wago.portIds.includes(portId)) {
+      if (wago.fixed) {
+        const port = world.ports[portId];
+        const flagCode = port?.label.split(":")[0] ?? "M";
+        return `Motor [${flagCode}]`;
+      }
+      const slots = wago.slots ?? wago.portIds.length;
+      return `${slots}-as WAGO`;
+    }
+  }
+
+  return "Kapocs";
+}
+
+export function formatWireClampLabel(world: World, wire: Wire): string {
+  const colorName = WIRE_COLORS[wire.color]?.name ?? wire.color;
+  const fromLbl = formatPortAnonymousEndpoint(world, wire.startPortId);
+  const toLbl = formatPortAnonymousEndpoint(world, wire.endPortId);
+  return `${colorName} vezeték (${fromLbl} ↔ ${toLbl})`;
+}
+
+/**
+ * Megkeresi a lakatfogó pofájának célpontját a legközelebbi vezetékszakaszon,
+ * visszaadva a vetített középpontot, a vezeték érintőszögét és az információelrejtést tisztelő címkét.
+ */
+export function hitClampTarget(
+  world: World,
+  p: Point,
+  threshold = 14,
+): ClampTarget | undefined {
+  let bestTarget: ClampTarget | undefined;
+  let bestDist = threshold;
+
+  for (const wire of world.wires) {
+    if (wire.points.length < 2) continue;
+    for (let i = 0; i < wire.points.length - 1; i += 1) {
+      const a = wire.points[i];
+      const b = wire.points[i + 1];
+      const vx = b.x - a.x;
+      const vy = b.y - a.y;
+      const len2 = vx * vx + vy * vy;
+      if (len2 < 1e-6) continue;
+
+      let t = ((p.x - a.x) * vx + (p.y - a.y) * vy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const projX = a.x + t * vx;
+      const projY = a.y + t * vy;
+      const d = Math.hypot(p.x - projX, p.y - projY);
+
+      if (d <= bestDist) {
+        bestDist = d;
+        bestTarget = {
+          wireId: wire.id,
+          x: projX,
+          y: projY,
+          angle: Math.atan2(vy, vx),
+          segIndex: i,
+          segT: t,
+          displayLabel: formatWireClampLabel(world, wire),
+        };
+      }
+    }
+  }
+
+  return bestTarget;
+}
+
+/**
+ * Szinkronban tartja a vezetéken rögzített lakatfogót a világgal (pl. ha a vezetéket kivágták).
+ */
+export function syncClampTarget(
+  world: World,
+  target: ClampTarget | undefined,
+): ClampTarget | undefined {
+  if (!target) return undefined;
+  const wire = world.wires.find((w) => w.id === target.wireId);
+  if (!wire || wire.points.length < 2) return undefined;
+
+  const segIndex = Math.max(0, Math.min(target.segIndex, wire.points.length - 2));
+  const segT = Math.max(0, Math.min(1, target.segT));
+  const a = wire.points[segIndex];
+  const b = wire.points[segIndex + 1];
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+
+  return {
+    wireId: wire.id,
+    x: a.x + segT * vx,
+    y: a.y + segT * vy,
+    angle: Math.atan2(vy, vx),
+    segIndex,
+    segT,
+    displayLabel: formatWireClampLabel(world, wire),
+  };
 }
 
 export type DraftWire = {
