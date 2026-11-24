@@ -244,13 +244,6 @@ export function createPrototypeWorld(): World {
     pir_l: node("pir_l", "Mozgásérzékelő", "L↑ betáp", "L↑"),
     pir_n: node("pir_n", "Mozgásérzékelő", "N↑ betáp", "N↑"),
     pir_out: node("pir_out", "Mozgásérzékelő", "L↓ kapcsolt fázis", "L↓"),
-
-    // 5 Wago csomópont
-    wago_node_1: node("wago_node_1", "Wago 1 (5-ös)", "5-ös összekötő", "W1"),
-    wago_node_2: node("wago_node_2", "Wago 2 (5-ös)", "5-ös összekötő", "W2"),
-    wago_node_3: node("wago_node_3", "Wago 3 (5-ös)", "5-ös összekötő", "W3"),
-    wago_node_4: node("wago_node_4", "Wago 4 (5-ös)", "5-ös összekötő", "W4"),
-    wago_node_5: node("wago_node_5", "Wago 5 (5-ös)", "5-ös összekötő", "W5"),
   };
 
   // Pozíciók a pelda_kotes.jpg alapján
@@ -489,27 +482,8 @@ export function createPrototypeWorld(): World {
     );
   }
 
-  // 5 darab 5-ös Wago összekötő az alsó sorkapocssor alatt kényelmes távolságban
-  const wagos: WagoBlock[] = [
-    { id: "wago-1", nodeId: "wago_node_1", x: 700, y: 635, portIds: ["w1_1", "w1_2", "w1_3", "w1_4", "w1_5"] },
-    { id: "wago-2", nodeId: "wago_node_2", x: 860, y: 635, portIds: ["w2_1", "w2_2", "w2_3", "w2_4", "w2_5"] },
-    { id: "wago-3", nodeId: "wago_node_3", x: 1020, y: 635, portIds: ["w3_1", "w3_2", "w3_3", "w3_4", "w3_5"] },
-    { id: "wago-4", nodeId: "wago_node_4", x: 1180, y: 635, portIds: ["w4_1", "w4_2", "w4_3", "w4_4", "w4_5"] },
-    { id: "wago-5", nodeId: "wago_node_5", x: 1340, y: 635, portIds: ["w5_1", "w5_2", "w5_3", "w5_4", "w5_5"] },
-  ];
-
-  for (const wago of wagos) {
-    wago.portIds.forEach((pid, index) => {
-      ports[pid] = port(
-        pid,
-        wago.nodeId,
-        "wago",
-        wago.x + 18 + index * 24,
-        wago.y + 46,
-        `${wago.id}:${index + 1}`,
-      );
-    });
-  }
+  // A szabad fal induláskor Wago nélkül indul (a WAGO dobozokból húzható ki)
+  const wagos: WagoBlock[] = [];
 
   // Interaktív és vizuális készülékek elhelyezése a pelda_kotes.jpg alapján:
   const devices: Device[] = [

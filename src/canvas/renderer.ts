@@ -1,5 +1,6 @@
 import { MARK_FILL, WIRE_COLORS } from "../data/colors";
 import { UPPER_TERMINAL_GROUPS, LOWER_TERMINAL_GROUPS } from "../data/terminalLegend";
+import { WAGO_BOXES } from "../data/wagoBoxes";
 import { isWireLive } from "../engine/simulation";
 import { hasWagoWires, isWireEndSecure } from "../models/world";
 import type { Point, Port, SimState, TerminalColumn, ToolMode, World } from "../models/types";
@@ -11,6 +12,7 @@ export interface RenderExtras {
   hoverWireId?: string;
   hoverWagoId?: string;
   draggedWagoId?: string;
+  hoverWagoBoxSlots?: 3 | 5;
   draft?: { points: Point[]; color: keyof typeof WIRE_COLORS };
   tooltip?: { x: number; y: number; lines: string[] };
 }
@@ -711,13 +713,22 @@ function drawWago(
   hoverWagoId?: string,
   draggedWagoId?: string,
 ) {
+  const slots = wago.slots ?? (wago.portIds.length as 3 | 5);
   const w = 18 + wago.portIds.length * 24;
   const h = 66;
+  const cx = wago.x + w / 2;
+  const cy = wago.y + h / 2;
   const isDragging = draggedWagoId === wago.id;
   const hasWires = hasWagoWires(world, wago.id);
-  const isHovered = hoverWagoId === wago.id && !hasWires;
+  const isHovered = hoverWagoId === wago.id && !wago.fixed && !hasWires;
 
   ctx.save();
+  ctx.translate(cx, cy);
+  if (wago.rotation) {
+    ctx.rotate((wago.rotation * Math.PI) / 180);
+  }
+  ctx.translate(-cx, -cy);
+
   if (isDragging) {
     ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
     ctx.shadowBlur = 12;
@@ -730,7 +741,7 @@ function drawWago(
     ? "rgba(255, 255, 255, 0.98)"
     : "rgba(240, 242, 245, 0.96)";
   ctx.fill();
-  ctx.strokeStyle = isDragging ? "#2563eb" : isHovered ? "#3b82f6" : "#374151";
+  ctx.strokeStyle = isDragging ? "#2563eb" : isHovered ? "#3b82f6" : wago.fixed ? "#64748b" : "#374151";
   ctx.lineWidth = isDragging || isHovered ? 2 : 1.3;
   ctx.stroke();
 
@@ -738,23 +749,30 @@ function drawWago(
   ctx.fillStyle = "#d97706";
   ctx.fillRect(wago.x + 10, wago.y + 34, w - 20, 4);
 
+  // Model text: WAGO 221-413 (3-as) or WAGO 221-415 (5-ös)
+  const modelText = slots === 3 ? "WAGO 221-413" : "WAGO 221-415";
   ctx.fillStyle = "#111";
-  ctx.font = "800 9.5px Segoe UI, sans-serif";
+  ctx.font = "800 8.5px Segoe UI, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("WAGO 221", wago.x + 8, wago.y + 13);
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(modelText, wago.x + 8, wago.y + 13);
 
-  // If movable (no wires attached), show subtle grip indicator dots at top-right
-  if (!hasWires) {
-    const gripX = wago.x + w - 16;
-    const gripY = wago.y + 7;
-    ctx.fillStyle = isHovered || isDragging ? "#2563eb" : "#9ca3af";
-    for (let gx = 0; gx < 2; gx += 1) {
-      for (let gy = 0; gy < 3; gy += 1) {
-        ctx.beginPath();
-        ctx.arc(gripX + gx * 4.5, gripY + gy * 4, 1.2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+  // Rotate button in top-right corner if not fixed and not wired
+  if (!wago.fixed && !hasWires) {
+    const btnX = wago.x + w - 24;
+    const btnY = wago.y + 3;
+    roundRect(ctx, btnX, btnY, 20, 14, 3);
+    ctx.fillStyle = isHovered ? "rgba(37, 99, 235, 0.15)" : "rgba(0, 0, 0, 0.04)";
+    ctx.fill();
+    ctx.strokeStyle = isHovered ? "#3b82f6" : "#cbd5e1";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = isHovered ? "#1d4ed8" : "#64748b";
+    ctx.font = "bold 10px Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("↻", btnX + 10, btnY + 7);
   }
 
   wago.portIds.forEach((pid, index) => {
@@ -774,18 +792,118 @@ function drawWago(
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Port hole
+    // Port hole at unrotated local coords (canvas rotation maps it exactly to world port.x, port.y)
+    const localPx = wago.x + 18 + index * 24;
+    const localPy = wago.y + 46;
     ctx.beginPath();
-    ctx.arc(port.x, port.y, 5.5, 0, Math.PI * 2);
+    ctx.arc(localPx, localPy, 5.5, 0, Math.PI * 2);
     ctx.fillStyle = "#1f2937";
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(port.x, port.y, 2.5, 0, Math.PI * 2);
+    ctx.arc(localPx, localPy, 2.5, 0, Math.PI * 2);
     ctx.fillStyle = "#f59e0b";
     ctx.fill();
   });
 
   ctx.restore();
+}
+
+function drawWagoBoxes(
+  ctx: CanvasRenderingContext2D,
+  world: World,
+  extras: RenderExtras,
+) {
+  const draggedWago = extras.draggedWagoId
+    ? world.wagos.find((w) => w.id === extras.draggedWagoId)
+    : undefined;
+  const isDraggingEmptyWago =
+    draggedWago && !draggedWago.fixed && !hasWagoWires(world, draggedWago.id);
+
+  for (const box of WAGO_BOXES) {
+    const isHovered = extras.hoverWagoBoxSlots === box.slots;
+    ctx.save();
+
+    // Box outer container (industrial parts tray / dispenser box on desk)
+    roundRect(ctx, box.x, box.y, box.w, box.h, 6);
+    ctx.fillStyle = isHovered && isDraggingEmptyWago
+      ? "rgba(16, 185, 129, 0.28)"
+      : isDraggingEmptyWago
+        ? "rgba(16, 185, 129, 0.16)"
+        : isHovered
+          ? "#243247"
+          : "#1e293b";
+    ctx.fill();
+
+    // Border
+    if (isDraggingEmptyWago) {
+      ctx.setLineDash([5, 3]);
+      ctx.strokeStyle = isHovered ? "#10b981" : "#34d399";
+      ctx.lineWidth = isHovered ? 2.5 : 1.8;
+    } else {
+      ctx.strokeStyle = isHovered ? "#38bdf8" : "#475569";
+      ctx.lineWidth = isHovered ? 1.8 : 1.2;
+    }
+    ctx.stroke();
+
+    // Header banner
+    roundRect(ctx, box.x + 2, box.y + 2, box.w - 4, 22, 4);
+    ctx.fillStyle = isDraggingEmptyWago
+      ? isHovered ? "#065f46" : "#064e3b"
+      : isHovered ? "#0284c7" : "#0f172a";
+    ctx.fill();
+
+    // Header title
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "800 10px Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(
+      isDraggingEmptyWago ? "⬇ VISSZADOBÁS" : box.title.toUpperCase(),
+      box.x + box.w / 2,
+      box.y + 16,
+    );
+
+    // Box body content
+    if (isDraggingEmptyWago) {
+      ctx.fillStyle = isHovered ? "#a7f3d0" : "#6ee7b7";
+      ctx.font = "700 9px Segoe UI, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(isHovered ? "Engedd el itt a törléshez!" : "Húzd ide a törléshez", box.x + box.w / 2, box.y + 52);
+
+      ctx.fillStyle = "#d1fae5";
+      ctx.font = "800 20px Segoe UI, sans-serif";
+      ctx.fillText("♻", box.x + box.w / 2, box.y + 78);
+    } else {
+      // Miniature preview of the Wago block in the box
+      const previewW = 14 + box.slots * 16;
+      const previewH = 38;
+      const prevX = box.x + (box.w - previewW) / 2;
+      const prevY = box.y + 32;
+
+      roundRect(ctx, prevX, prevY, previewW, previewH, 4);
+      ctx.fillStyle = "#f1f5f9";
+      ctx.fill();
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Orange levers preview
+      for (let s = 0; s < box.slots; s++) {
+        const lx = prevX + 6 + s * 16;
+        const ly = prevY + 6;
+        roundRect(ctx, lx, ly, 10, 16, 2);
+        ctx.fillStyle = "#ea580c";
+        ctx.fill();
+      }
+
+      // Catalog number and hint
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "700 8.5px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`Typ ${box.code}`, box.x + box.w / 2, box.y + 86);
+    }
+
+    ctx.restore();
+  }
 }
 
 function drawDevices(ctx: CanvasRenderingContext2D, world: World, sim: SimState) {
@@ -1284,6 +1402,9 @@ export function renderWorld(
       drawColumn(ctx, col, port, isHovered, isScrewdriverHover, extras.debug);
     }
   }
+
+  // Draw WAGO dispenser boxes on the workbench
+  drawWagoBoxes(ctx, world, extras);
 
   for (const wago of world.wagos) {
     drawWago(ctx, world, wago, extras.hoverPortId, extras.hoverWagoId, extras.draggedWagoId);

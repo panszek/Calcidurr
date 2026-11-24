@@ -1,9 +1,16 @@
 import { createPrototypeWorld } from "../data/prototypeTrack";
 import type { Wire, WireColorId, World } from "../models/types";
-import { addWire, setPortTight } from "../models/world";
+import { addWire, setPortTight, spawnWago } from "../models/world";
 
 export function createTestWorld(): World {
-  return createPrototypeWorld();
+  const world = createPrototypeWorld();
+  // 5 darab teszt 5-ös WAGO a szimulációs és regressziós tesztekhez
+  spawnWago(world, 5, 700, 635);
+  spawnWago(world, 5, 860, 635);
+  spawnWago(world, 5, 1020, 635);
+  spawnWago(world, 5, 1180, 635);
+  spawnWago(world, 5, 1340, 635);
+  return world;
 }
 
 export function portOf(nodeId: string): string {

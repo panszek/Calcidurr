@@ -97,6 +97,9 @@ export interface WagoBlock {
   x: number;
   y: number;
   portIds: string[];
+  slots?: 3 | 5;
+  fixed?: boolean;
+  rotation?: 0 | 90 | 180 | 270;
 }
 
 export interface Device {

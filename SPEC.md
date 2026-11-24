@@ -52,7 +52,7 @@ A kód a következő modulokra oszlik (Vite + TypeScript, böngészőben Canvas)
   - `prototypeTrack.ts` — az MVP tesztpálya koordinátái és csomópontjai.
 - `src/__tests__/` — Vitest automatizált unit és szimulációs regressziós tesztek (`npm test`).
   - `testHelpers.ts` — újrahasznosítható bekötő és tápkapcsoló segédfüggvények.
-  - `world.test.ts`, `simulation.test.ts`, `input.test.ts`, `prototypeTrack.test.ts` — világmutációk, áramköri szimuláció, kezdőállapotok és Canvas hit-testek ellenőrzése.
+  - `world.test.ts`, `simulation.test.ts`, `input.test.ts`, `prototypeTrack.test.ts`, `wago.test.ts` — világmutációk, áramköri szimuláció, kezdőállapotok, WAGO kezelés és Canvas hit-testek ellenőrzése.
 
 ## 6. Vizuális referenciák
 A `sources/` mappa a valós oktatófalat dokumentálja:
@@ -68,7 +68,10 @@ Ezek a szabályok a SPEC 1–4. pontjait egészítik ki a megvalósítás során
 - **Kezdőállapot:** Az oktatófal mindig teljesen **kikapcsolt (`on: false`)** állapotban indul (minden kismegszakító, motorvédő és kapcsoló KI állásban van), a sorkapcsok feszültségmentesek.
 - **Ergonomikus csavarviselkedés:** Az üres sorkapcsok alapból **kilazított (`tight: false`)** állapotban várják a bekötést, így a tanulónak nem kell előre kitekernie a csavart a vezeték rögzítéséhez. Új vezeték bekötése után a csatlakozási pont laza marad, amit a tanulónak a Csavarhúzóval meg kell húznia (`tight: true`).
 - **Csavarok megjelenése:** A felső fix és az alsó meghúzott csavar horonyiránya egységesen vízszintes (0°); laza állapotban 90°-kal elfordul (függőleges), világosabb fejjel és nyitott réz kengyellel. Csavarhúzó hover esetén célzott kiemelő gyűrű jelenik meg a csavarfej körül.
-- A Wago 3 nyílása **közös elektromos csomópont**: a zárt karú, bekötött erek párhuzamosan kötnek.
+- **WAGO összekötők és dobozok:** A munkapadon két alkatrészdoboz található: **WAGO 221-413 (3-as)** és **WAGO 221-415 (5-ös)**. A dobozokból drag-and-drop húzással vagy kattintással tetszőleges számú WAGO helyezhető el a falon. Az újonnan létrehozott WAGO-k nyitott karokkal (`tight: false`) indulnak, kész a vezeték bekötésére.
+- **WAGO forgathatóság:** A WAGO-k 90°-os diszkrét lépésekben (0°, 90°, 180°, 270°) szabadon elforgathatók, amíg nincsenek bekötve. A forgatás történhet az **`R` billentyűvel** (mozgatás közben vagy hovernél), a blokk jobb felső sarkában található **`↻` forgató gombbal**, vagy **jobb egérgombbal**. A kapcsok pozíciója a blokk középpontja körül forog el. Bekötött vezetékkel rendelkező WAGO sem nem mozgatható, sem nem forgatható (a forgató gomb ilyenkor elrejtődik, `R` vagy jobb klikk esetén toast figyelmeztet). A rögzített (`fixed: true`) WAGO-k szintén védettek.
+- **WAGO visszadobása és védelme:** Üres, nem rögzített (`!wago.fixed && !hasWagoWires`) WAGO a munkapadi dobozokra visszahúzva törlődik. A bekötött WAGO-k nem mozgathatók, nem forgathatók és nem törölhetők a vezetékek kikötése nélkül. A rögzített (`fixed: true`) WAGO-k sem nem mozgathatók, sem nem forgathatók.
+- A Wago nyílásai **közös elektromos csomópontot** alkotnak: a zárt karú, bekötött erek párhuzamosan kötnek.
 - **Kismegszakító (`1P B10A`):** kéz eszközzel BE/KI. Csak BE állásban a `L1` sorkapocs tápforrás. Zárlatkor automatikus leoldás + hibaüzenet.
 - **Egypólusú kapcsoló:** kattintásra billen, zárva belső él `1–2` között.
 - **Nyomógomb (NO):** **lenyomva tartva** zár (`3–4`), elengedve bont (momentán).

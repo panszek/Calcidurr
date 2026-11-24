@@ -217,10 +217,20 @@ A kódban feltárt hibák javítása úgy, hogy a felhasználót ne terhelje el�
 
 ---
 
-### 9. Wago fejlesztések (3-as Wago, új Wago dobozból, visszadobható Wago)
+### 9. Wago fejlesztések (3-as és 5-ös Wago, dobozból húzás, visszadobás, forgathatóság)
 
 - **3-as és 5-ös Wago támogatás (`WagoBlock.slots: 3 | 5`, `fixed?: boolean`):**
-  - `WAGO 221-413` (3-as, `90 px` széles) és `WAGO 221-415` (5-ös, `138 px` széles) kivitel tiszta felirattal és ütközésmentes fogópontokkal (grip dots).
+  - `WAGO 221-413` (3-as, `90 px` széles) és `WAGO 221-415` (5-ös, `138 px` széles) kivitel tiszta felirattal és forgató gombbal (`↻`).
+- **Wago forgathatóság (90°-os lépések: 0°, 90°, 180°, 270°):**
+  - `rotation?: 0 | 90 | 180 | 270` a `WagoBlock` modellben.
+  - `rotateWago(world, wagoId)`: 90 fokos lépésekben forgatja a blokkot a középpontja körül.
+  - A forgatás során a portok pozíciója (`getWagoPortPos`) pontosan kiszámolásra kerül.
+  - **Védelem:** Bekötött (`hasWagoWires`) vagy rögzített (`wago.fixed`) WAGO egyáltalán nem forgatható (mint ahogy mozgatni és törölni sem lehet), próbálkozáskor toast figyelmeztetés jelenik meg.
+  - `toWagoLocalPoint`: inverz forgatásos koordináta-transzformáció a pontos hit-testinghez (`hitWago`, `hitWagoLever`, `hitWagoRotateButton`).
+  - **Irányítás:**
+    - `R` billentyű lenyomása a Wago húzása (drag) vagy felette lebegés (hover) közben.
+    - Kattintás a Wago jobb felső sarkában lévő `↻` forgató gombra (csak üres, még be nem kötött WAGO-n jelenik meg).
+    - Jobb egérgombbal kattintás a Wagora.
 - **Új Wago dobozból (`spawnWago`):**
   - A fal induláskor nem 5 előre lerakott szabad Wago-val van tele (a szabad tér üresen indul, kivéve a motor fix 6+1 Wago-ját).
   - A munkapadon két vizuális **WAGO doboz** van: **3-as WAGO doboz** és **5-ös WAGO doboz**.
@@ -228,12 +238,13 @@ A kódban feltárt hibák javítása úgy, hogy a felhasználót ne terhelje el�
 - **Visszadobható Wago (`removeWago`):**
   - Üres, nem fix (`!wago.fixed && !hasWagoWires`) Wago húzásakor a WAGO doboz zónája vizuálisan kiemelődik (visszadobási zóna).
   - A doboz felett elengedve a Wago, annak portjai és csomópontja tisztán törlődik a `world`-ből.
-  - Bekötött Wago továbbra sem mozgatható / nem dobható vissza, amíg van benne vezeték.
+  - Bekötött Wago nem mozgatható / nem dobható vissza, amíg van benne vezeték (helyben forgatása viszont megengedett).
 - **Érintett fájlok:** `src/models/types.ts`, `src/models/world.ts`, `src/data/prototypeTrack.ts`, `src/canvas/renderer.ts`, `src/canvas/input.ts`, `src/main.ts`.
 - **Tesztelési szempontok:**
   - A 3-as dobozból 3 portos, az 5-ös dobozból 5 portos Wago húzható ki a falra, korlátlan darabszámban.
   - Üres Wago a dobozra visszahúzva eltűnik; bekötött Wago nem mozgatható és hibaüzenetet ad.
   - A 3-as és 5-ös Wago-k elektromosan ugyanúgy közös csomópontként működnek zárt karoknál.
+  - Forgatáskor 90°-onként forog a blokk, a kapcsok és a bekötött vezetékek a helyükön maradnak, a hit-test pontosan működik.
 
 ---
 
@@ -288,7 +299,14 @@ flowchart LR
   - **Holtzóna és visszajelzés javítások (`src/canvas/input.ts`, `src/main.ts`):** új `hitColumnLowerHalf` megakadályozza a véletlen pan (vászonhúzás) indítását sorkapocs alsó részére kattintáskor; csavarhúzóval WAGO-ra kattintva toast figyelmeztet a Kéz eszköz használatára.
   - **Elírás javítása:** `src/canvas/legendTable.ts` és `src/data/prototypeTrack.ts` `56 db → 54 db` sorkapocs javítva.
   - **Tesztek:** `src/__tests__/prototypeTrack.test.ts` (4 teszt: OFF állapotok, laza csavarok, 0V feszültség, kapcsolható kimenetek) létrehozva, `src/__tests__/input.test.ts` bővítve szomszédos csavarhatárok és alsó oszlop hit-testekkel.
-- [ ] **2. szál (Wago):** 9. pont (3-as és 5-ös Wago, `fixed` flag előkészítése, dobozból kihúzás a munkapad végleges zónájában, visszadobás) + `wago.test.ts`.
+- [x] **2. szál (Wago) — KÉSZ (3-as és 5-ös WAGO, dobozok, forgathatóság):** 3-as és 5-ös WAGO támogatás, WAGO dobozok a munkapadon, dobozból kihúzás és visszadobás, valamint 90°-os lépésekben történő tetszőleges forgatás kész, Vitest tesztek zöldek (`48/48` teszt + `npm run build` sikeres):
+  - **3-as és 5-ös WAGO típusok (`WagoBlock.slots: 3 | 5`, `fixed?: boolean`):** `WAGO 221-413` (3-as, 90 px) és `WAGO 221-415` (5-ös, 138 px) típusok pontos tipográfiával és forgató gombbal (`↻`).
+  - **2 db WAGO doboz a munkapadon (`src/data/wagoBoxes.ts`, `src/canvas/renderer.ts`):** 3-as (`x = 940..1075`) és 5-ös (`x = 1105..1260`) vizuális alkatrészdoboz belső miniatűr előnézettel a munkapad asztallapján.
+  - **Új WAGO dobozból (`spawnWago`):** A dobozra kattintva vagy abból drag-and-drop húzással korlátlan számú új 3-as vagy 5-ös Wago hozható létre (alapból nyitott karokkal, bekötésre készen). A táblafelület tiszta indulóállapottal indul (`wagos: []`).
+  - **Visszadobható WAGO (`removeWago`):** Üres, nem rögzített (`!wago.fixed && !hasWagoWires`) Wago húzásakor mindkét doboz kiemelkedő zöld szaggatott keretes visszadobási zónává (drop target) alakul át (`⬇ VISSZADOBÁS` / `♻`). A doboz felett elengedve a WAGO, a portjai és csomópontja tisztán törlődik a modellből.
+  - **WAGO forgathatóság (`rotateWago`):** 90°-os diszkrét lépésekben (0°, 90°, 180°, 270°) forgatható az üres blokk a középpontja körül. Vezérlés: `R` billentyűvel (mozgatás közben vagy hovernél), a blokk jobb felső `↻` gombjára kattintva, vagy jobb klikkel.
+  - **Védelem:** Bekötött WAGO (`hasWagoWires`) és rögzített WAGO (`wago.fixed`) sem nem mozgatható, sem nem forgatható, sem nem dobható vissza (figyelmeztető toast).
+  - **Tesztek:** [`src/__tests__/wago.test.ts`](file:///c:/Users/SIH6SS/Calcidurr/src/__tests__/wago.test.ts) (14 teszt: 3-as/5-ös spawn, tiszta kezdőfal, mozgathatóság, szimuláció, törlés, bekötött/rögzített mozgatási ÉS forgatási védelmek, doboz hit-test, 90°-os ciklikus forgatás, kapcsok pozíció-újratervezése, forgatott hit-testing és kar-érzékelés) mind zöld.
 - [ ] **3. szál (ÁVK-k):** 3. pont (4P és 2P ÁVK a kiselosztóban, működő `T` tesztgomb, upstream védelem és hibaáram-leoldás) + `rcd.test.ts`.
 - [ ] **4. szál (3F Villanymotor):** 1. pont (3F motor animációval + poszter alatti 6+1 fix 3-as WAGO fekete/zöld-sárga kábelköteggel és fehér szigszalag feliratokkal) + `motor.test.ts`.
 - [ ] **5. szál (Kábelszín validáció):** 5. pont (fekete / kék / zöld-sárga szabályrendszer + hibaösszesítő és Canvas kiemelés) + `colorCheck.test.ts`.

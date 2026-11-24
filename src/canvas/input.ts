@@ -1,5 +1,9 @@
 import { SNAP_RADIUS, WIRE_SAMPLE_GAP } from "../data/colors";
-import type { Point, Port, ToolMode, Wire, WireColorId, World } from "../models/types";
+import { hitWagoBox, WAGO_BOXES, type WagoBoxDef } from "../data/wagoBoxes";
+import type { Point, Port, ToolMode, WagoBlock, Wire, WireColorId, World } from "../models/types";
+import { hasWagoWires } from "../models/world";
+
+export { hitWagoBox, WAGO_BOXES, type WagoBoxDef };
 
 export function dist(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -102,16 +106,49 @@ export function hitLegendPoster(p: Point): boolean {
   return p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph;
 }
 
+export function toWagoLocalPoint(
+  wago: Pick<WagoBlock, "x" | "y" | "portIds" | "slots" | "rotation">,
+  p: Point,
+): Point {
+  const slots = wago.slots ?? (wago.portIds.length as 3 | 5);
+  const w = 18 + slots * 24;
+  const h = 66;
+  const cx = wago.x + w / 2;
+  const cy = wago.y + h / 2;
+  const dx = p.x - cx;
+  const dy = p.y - cy;
+  const rot = wago.rotation ?? 0;
+
+  let localDx = dx;
+  let localDy = dy;
+  if (rot === 90) {
+    localDx = dy;
+    localDy = -dx;
+  } else if (rot === 180) {
+    localDx = -dx;
+    localDy = -dy;
+  } else if (rot === 270) {
+    localDx = -dy;
+    localDy = dx;
+  }
+
+  return {
+    x: localDx + w / 2,
+    y: localDy + h / 2,
+  };
+}
+
 export function hitWagoLever(world: World, p: Point): Port | undefined {
   for (const wago of world.wagos) {
+    const lp = toWagoLocalPoint(wago, p);
     for (let i = 0; i < wago.portIds.length; i += 1) {
       const pid = wago.portIds[i];
       const closed = world.ports[pid].tight;
-      const lx = wago.x + 8 + i * 24;
-      const ly = wago.y + 18;
+      const lx = 8 + i * 24;
+      const ly = 18;
       const lw = 18;
       const lh = closed ? 14 : 26;
-      if (p.x >= lx && p.x <= lx + lw && p.y >= ly && p.y <= ly + lh) {
+      if (lp.x >= lx && lp.x <= lx + lw && lp.y >= ly && lp.y <= ly + lh) {
         return world.ports[pid];
       }
     }
@@ -123,8 +160,21 @@ export function hitWago(world: World, p: Point) {
   return world.wagos.find((wago) => {
     const w = 18 + wago.portIds.length * 24;
     const h = 66;
-    return p.x >= wago.x && p.x <= wago.x + w && p.y >= wago.y && p.y <= wago.y + h;
+    const lp = toWagoLocalPoint(wago, p);
+    return lp.x >= 0 && lp.x <= w && lp.y >= 0 && lp.y <= h;
   });
+}
+
+export function hitWagoRotateButton(world: World, p: Point): WagoBlock | undefined {
+  for (const wago of world.wagos) {
+    if (wago.fixed || hasWagoWires(world, wago.id)) continue;
+    const w = 18 + wago.portIds.length * 24;
+    const lp = toWagoLocalPoint(wago, p);
+    if (lp.x >= w - 24 && lp.x <= w - 4 && lp.y >= 3 && lp.y <= 17) {
+      return wago;
+    }
+  }
+  return undefined;
 }
 
 function pointToSegment(p: Point, a: Point, b: Point): number {

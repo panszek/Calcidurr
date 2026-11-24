@@ -8,7 +8,9 @@ import {
   hitLegendPoster,
   hitScrewdriverTarget,
   hitWago,
+  hitWagoBox,
   hitWagoLever,
+  hitWagoRotateButton,
   hitWire,
   nearestPort,
   sampleDraft,
@@ -25,8 +27,11 @@ import {
   isPortOccupied,
   isWireRemovable,
   moveWago,
+  removeWago,
   removeWire,
+  rotateWago,
   setButtonPressed,
+  spawnWago,
   tickWorld,
   toggleDevice,
   togglePortTight,
@@ -57,8 +62,11 @@ let draggedWago:
       ox: number;
       oy: number;
       moved: boolean;
+      isNewSpawn?: boolean;
+      boxSlots?: 3 | 5;
     }
   | undefined;
+let hoveredWagoBoxSlots: 3 | 5 | undefined;
 let pendingLeverPort: Port | undefined;
 let pressedButtonId: string | undefined;
 let toastTimer = 0;
@@ -229,6 +237,7 @@ function draw() {
     hoverWireId,
     hoverWagoId: hoveredWagoId,
     draggedWagoId: draggedWago?.id,
+    hoverWagoBoxSlots: hoveredWagoBoxSlots,
     draft: draft ? { points: draft.points, color: draft.color } : undefined,
     tooltip: hoverPortId ? tooltipForPort(hoverPortId) : undefined,
   });
@@ -245,7 +254,24 @@ canvas.addEventListener(
   { passive: false },
 );
 
-canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  const p = eventPoint(e);
+  const w = hitWago(world, p);
+  if (w) {
+    if (w.fixed) {
+      showToast("A motor WAGO-ja rögzített, nem forgatható!");
+      return;
+    }
+    if (hasWagoWires(world, w.id)) {
+      showToast("Bekötött WAGO nem forgatható! Előbb kösd ki a vezetékeket.");
+      return;
+    }
+    rotateWago(world, w.id);
+    runSim();
+    draw();
+  }
+});
 
 canvas.addEventListener("pointerdown", (event) => {
   try {
@@ -275,6 +301,33 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
 
+  // WAGO dobozra kattintás (új 3-as vagy 5-ös WAGO kihúzása a munkapadról)
+  const clickedBox = hitWagoBox(p);
+  if (clickedBox) {
+    if (tool === "screwdriver") {
+      showToast("A WAGO dobozhoz válaszd a Kéz eszközt!");
+      return;
+    }
+    if (tool === "cutter") {
+      return;
+    }
+    const w = 18 + clickedBox.slots * 24;
+    const h = 66;
+    const newWago = spawnWago(world, clickedBox.slots, p.x - w / 2, p.y - h / 2);
+    draggedWago = {
+      id: newWago.id,
+      startX: p.x,
+      startY: p.y,
+      ox: w / 2,
+      oy: h / 2,
+      moved: false,
+      isNewSpawn: true,
+      boxSlots: clickedBox.slots,
+    };
+    draw();
+    return;
+  }
+
   if (tool === "wire") {
     const upperCol = hitColumnUpperHalf(world, p);
     if (upperCol) {
@@ -293,6 +346,10 @@ canvas.addEventListener("pointerdown", (event) => {
     if (!port) {
       const clickedWago = hitWago(world, p);
       if (clickedWago) {
+        if (clickedWago.fixed) {
+          showToast("A motor WAGO-ja rögzített, nem mozgatható!");
+          return;
+        }
         if (!hasWagoWires(world, clickedWago.id)) {
           draggedWago = {
             id: clickedWago.id,
@@ -358,9 +415,22 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
 
+  // Check if click was on WAGO rotate button
+  const rotateTarget = hitWagoRotateButton(world, p);
+  if (rotateTarget) {
+    rotateWago(world, rotateTarget.id);
+    runSim();
+    draw();
+    return;
+  }
+
   if (tool === "hand") {
     const clickedWago = hitWago(world, p);
     if (clickedWago) {
+      if (clickedWago.fixed) {
+        showToast("A motor WAGO-ja rögzített, nem mozgatható!");
+        return;
+      }
       const isWired = hasWagoWires(world, clickedWago.id);
       const lever = hitWagoLever(world, p);
 
@@ -477,16 +547,24 @@ canvas.addEventListener("pointermove", (event) => {
     if (draggedWago.moved) {
       const wago = world.wagos.find((w) => w.id === draggedWago!.id);
       if (wago) {
-        const w = 18 + wago.portIds.length * 24;
-        const nx = Math.max(10, Math.min(LOGICAL.w - w - 10, p.x - draggedWago.ox));
-        const ny = Math.max(10, Math.min(LOGICAL.h - 76, p.y - draggedWago.oy));
-        moveWago(world, draggedWago.id, nx, ny);
+        const isRotVert = wago.rotation === 90 || wago.rotation === 270;
+        const slots = wago.slots ?? (wago.portIds.length as 3 | 5);
+        const w = 18 + slots * 24;
+        const h = 66;
+        const effW = isRotVert ? h : w;
+        const effH = isRotVert ? w : h;
+        const cx = Math.max(10 + effW / 2, Math.min(LOGICAL.w - 10 - effW / 2, p.x - draggedWago.ox + w / 2));
+        const cy = Math.max(10 + effH / 2, Math.min(LOGICAL.h - 10 - effH / 2, p.y - draggedWago.oy + h / 2));
+        moveWago(world, draggedWago.id, cx - w / 2, cy - h / 2);
       }
       canvas.style.cursor = "grabbing";
+      hoveredWagoBoxSlots = hitWagoBox(p)?.slots;
       draw();
       return;
     }
   }
+
+  hoveredWagoBoxSlots = hitWagoBox(p)?.slots;
 
   hoverPortId = (tool === "screwdriver" ? hitScrewdriverTarget(world, p) : nearestPort(world, p))?.id;
   if (!hoverPortId && tool === "wire") {
@@ -497,7 +575,7 @@ canvas.addEventListener("pointermove", (event) => {
   const hoveredWago = hitWago(world, p);
   hoveredWagoId = hoveredWago?.id;
 
-  if (hitLegendPoster(p)) {
+  if (hitLegendPoster(p) || hitWagoRotateButton(world, p)) {
     canvas.style.cursor = "pointer";
   } else if (tool === "hand") {
     if (hitWagoLever(world, p)) {
@@ -517,6 +595,8 @@ canvas.addEventListener("pointermove", (event) => {
     } else {
       canvas.style.cursor = cursorFor(tool, isPanning);
     }
+  } else if (hitWagoBox(p)) {
+    canvas.style.cursor = "pointer";
   } else {
     canvas.style.cursor = cursorFor(tool, isPanning);
   }
@@ -559,23 +639,49 @@ function finishDraft(p: { x: number; y: number }) {
 }
 
 canvas.addEventListener("pointerup", (event) => {
+  const p = eventPoint(event);
+
   if (isPanning) {
     isPanning = false;
     canvas.style.cursor = cursorFor(tool);
   }
 
   if (draggedWago) {
-    if (!draggedWago.moved && pendingLeverPort) {
-      togglePortTight(world, pendingLeverPort.id);
+    const wago = world.wagos.find((w) => w.id === draggedWago!.id);
+    const dropBox = hitWagoBox(p);
+
+    if (dropBox) {
+      // Released over a WAGO box: return / delete it
+      if (wago && !wago.fixed && !hasWagoWires(world, wago.id)) {
+        removeWago(world, wago.id);
+        showToast(draggedWago.isNewSpawn ? "Művelet visszavonva." : "WAGO visszatéve a dobozba.");
+        runSim();
+      }
+    } else if (draggedWago.isNewSpawn) {
+      // New spawn released on the board
+      if (!draggedWago.moved) {
+        // If it was just a quick click on the box without dragging, place it cleanly on the wall
+        if (wago) {
+          const placeX = Math.max(700, Math.min(1400, p.x - 45));
+          const placeY = 635;
+          moveWago(world, wago.id, placeX, placeY);
+        }
+      }
+      showToast(`Új ${draggedWago.boxSlots ?? 5}-ös WAGO elhelyezve a falon.`);
       runSim();
+    } else {
+      if (!draggedWago.moved && pendingLeverPort) {
+        togglePortTight(world, pendingLeverPort.id);
+        runSim();
+      }
     }
     draggedWago = undefined;
     pendingLeverPort = undefined;
+    hoveredWagoBoxSlots = undefined;
     canvas.style.cursor = cursorFor(tool);
     draw();
   }
 
-  const p = eventPoint(event);
   if (draft) finishDraft(p);
   if (pressedButtonId) {
     setButtonPressed(world, pressedButtonId, false);
@@ -601,6 +707,27 @@ canvas.addEventListener("pointerleave", () => {
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") spacePressed = true;
+  if (e.key === "r" || e.key === "R") {
+    const targetWagoId = draggedWago?.id ?? hoveredWagoId;
+    if (targetWagoId) {
+      const wago = world.wagos.find((w) => w.id === targetWagoId);
+      if (wago) {
+        if (wago.fixed) {
+          showToast("A motor WAGO-ja rögzített, nem forgatható!");
+          return;
+        }
+        if (hasWagoWires(world, wago.id)) {
+          showToast("Bekötött WAGO nem forgatható! Előbb kösd ki a vezetékeket.");
+          return;
+        }
+        const rotated = rotateWago(world, targetWagoId);
+        if (rotated) {
+          runSim();
+          draw();
+        }
+      }
+    }
+  }
 });
 
 window.addEventListener("keyup", (e) => {
@@ -652,6 +779,7 @@ toolbar.addEventListener("click", (event) => {
     draggedWago = undefined;
     pendingLeverPort = undefined;
     hoveredWagoId = undefined;
+    hoveredWagoBoxSlots = undefined;
     runSim();
     paintToolbar();
     draw();

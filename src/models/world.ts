@@ -1,4 +1,4 @@
-import type { Device, Port, World } from "./types";
+import type { Device, Port, WagoBlock, World } from "./types";
 
 export function cloneWorld(world: World): World {
   return structuredClone(world);
@@ -38,18 +38,152 @@ export function hasWagoWires(world: World, wagoId: string): boolean {
   );
 }
 
+export function getWagoPortPos(
+  wago: Pick<WagoBlock, "x" | "y" | "portIds" | "slots" | "rotation">,
+  index: number,
+): { x: number; y: number } {
+  const slots = wago.slots ?? (wago.portIds.length as 3 | 5);
+  const w = 18 + slots * 24;
+  const h = 66;
+  const cx = wago.x + w / 2;
+  const cy = wago.y + h / 2;
+
+  const dx = 18 + index * 24 - w / 2;
+  const dy = 46 - h / 2;
+
+  const rot = wago.rotation ?? 0;
+  let rotDx = dx;
+  let rotDy = dy;
+  if (rot === 90) {
+    rotDx = -dy;
+    rotDy = dx;
+  } else if (rot === 180) {
+    rotDx = -dx;
+    rotDy = -dy;
+  } else if (rot === 270) {
+    rotDx = dy;
+    rotDy = -dx;
+  }
+
+  return {
+    x: Math.round(cx + rotDx),
+    y: Math.round(cy + rotDy),
+  };
+}
+
 export function moveWago(world: World, wagoId: string, x: number, y: number) {
   const wago = world.wagos.find((w) => w.id === wagoId);
-  if (!wago) return;
+  if (!wago || wago.fixed) return;
   wago.x = x;
   wago.y = y;
   wago.portIds.forEach((pid, index) => {
     const port = world.ports[pid];
     if (port) {
-      port.x = x + 18 + index * 24;
-      port.y = y + 46;
+      const pos = getWagoPortPos(wago, index);
+      port.x = pos.x;
+      port.y = pos.y;
     }
   });
+}
+
+export function rotateWago(
+  world: World,
+  wagoId: string,
+  deltaDegrees: 90 | 180 | 270 = 90,
+): boolean {
+  const wago = world.wagos.find((w) => w.id === wagoId);
+  if (!wago || wago.fixed || hasWagoWires(world, wago.id)) return false;
+
+  const currentRot = wago.rotation ?? 0;
+  const nextRot = (((currentRot + deltaDegrees) % 360) as 0 | 90 | 180 | 270);
+  wago.rotation = nextRot;
+
+  // Frissítjük a kapcsok pozícióját
+  wago.portIds.forEach((pid, index) => {
+    const port = world.ports[pid];
+    if (port) {
+      const pos = getWagoPortPos(wago, index);
+      port.x = pos.x;
+      port.y = pos.y;
+    }
+  });
+
+  return true;
+}
+
+export function spawnWago(
+  world: World,
+  slots: 3 | 5,
+  x: number,
+  y: number,
+  options?: { fixed?: boolean; rotation?: 0 | 90 | 180 | 270 },
+): WagoBlock {
+  const wagoId = nextId("wago");
+  const nodeId = nextId("wago_node");
+
+  world.nodes[nodeId] = {
+    id: nodeId,
+    deviceName: `Wago (${slots}-as)`,
+    functionLabel: `${slots}-as összekötő`,
+    label: `W`,
+  };
+
+  const portIds: string[] = [];
+  for (let i = 0; i < slots; i++) {
+    const pid = `${wagoId}_p${i + 1}`;
+    portIds.push(pid);
+  }
+
+  const wago: WagoBlock = {
+    id: wagoId,
+    nodeId,
+    x,
+    y,
+    portIds,
+    slots,
+    fixed: options?.fixed ?? false,
+    rotation: options?.rotation ?? 0,
+  };
+
+  for (let i = 0; i < slots; i++) {
+    const pid = portIds[i];
+    const pos = getWagoPortPos(wago, i);
+    world.ports[pid] = {
+      id: pid,
+      nodeId,
+      kind: "wago",
+      x: pos.x,
+      y: pos.y,
+      label: `${wagoId}:${i + 1}`,
+      tight: false, // nyitott karral indul, bekötésre készen
+    };
+  }
+
+  world.wagos.push(wago);
+  return wago;
+}
+
+export function removeWago(world: World, wagoId: string): boolean {
+  const wagoIndex = world.wagos.findIndex((w) => w.id === wagoId);
+  if (wagoIndex === -1) return false;
+  const wago = world.wagos[wagoIndex];
+
+  // Rögzített (fixed) vagy bekötött (hasWagoWires) WAGO nem távolítható el
+  if (wago.fixed || hasWagoWires(world, wago.id)) {
+    return false;
+  }
+
+  // Töröljük a hozzá tartozó portokat
+  for (const pid of wago.portIds) {
+    delete world.ports[pid];
+  }
+
+  // Töröljük az elektromos csomópontot
+  delete world.nodes[wago.nodeId];
+
+  // Töröljük a wagos tömbből
+  world.wagos.splice(wagoIndex, 1);
+  return true;
 }
 
 export function isWireEndSecure(world: World, portId: string): boolean {
